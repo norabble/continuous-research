@@ -86,13 +86,15 @@ common agent toolkit. Settled plumbing:
 
 **Two independent identity / cost axes — kept separate on purpose:**
 
-1. **GitHub actor** (`github_token`) — *who opens PRs/commits.* Default for
-   mentions is the official `claude` GitHub App. ⚠️ **Verify:** the
-   comment-resolution leg requires that agent-authored PRs/commits *trigger
-   downstream workflows*; pushes made with the default `GITHUB_TOKEN` do **not**
-   (anti-recursion). This likely forces a **custom GitHub App**
-   (`actions/create-github-app-token`) even at Tier 0 — confirm before relying
-   on auto-resolution.
+1. **GitHub actor** (`github_token`) — *who opens PRs/commits.* Hard
+   requirement: agent pushes must run under a **GitHub App identity, not the
+   default `GITHUB_TOKEN`** — GITHUB_TOKEN pushes do **not** trigger downstream
+   workflows (anti-recursion), which would silently break the
+   comment-resolution leg. The official `claude` app appears to satisfy this; a
+   custom App via `create-github-app-token` is the guaranteed, controllable
+   path (and what Anthropic's own advanced examples use). Either way it is "an
+   App," so this does not change the architecture — *which* app suffices is a
+   build-time empirical check.
 2. **Claude credential** — *who pays for inference.* Four options, chosen per
    instance (this is the cost tier; see below). `ANTHROPIC_API_KEY` takes
    precedence over the OAuth token if both are set — guard against this footgun.
@@ -102,10 +104,10 @@ common agent toolkit. Settled plumbing:
 - **Tier 0 — Free / subscription-capped (default):** public repo (or
   self-hosted runner) + **`CLAUDE_CODE_OAUTH_TOKEN`** from the researcher's own
   Pro/Max subscription. Rate limits act as a hard ceiling, so runaway *dollar*
-  cost is structurally impossible. ⚠️ **Top open risk:** whether consumer
-  Pro/Max terms permit sustained scheduled/headless use as a framework's
-  default operating mode, and the fact that automation shares the same quota
-  the researcher uses interactively.
+  cost is structurally impossible. **Assumption (accepted):** consumer Pro/Max
+  terms permit this headless/scheduled use *for now* — we are not planning for
+  all contingencies. Real practical caveat that remains: automation shares the
+  same quota the researcher uses interactively.
 - **Tier 1 — Serious researcher (metered API):** `ANTHROPIC_API_KEY` **with an
   account spending limit set** + higher cadence / parallelism / larger models.
 - **Tier 2 — Funded / org:** Workload Identity Federation service account, or
@@ -118,10 +120,19 @@ caps + sane cron frequency · fork-PR secret hygiene.
 
 ### Framework shape (was Q-C — resolved)
 
-The framework is delivered as a **guided-configuration CLI**, *not* a copyable
-template. The CLI walks a researcher through tier selection, identity/secret
-setup, guardrails, and workflow generation for their instance. (CLI
-implementation specifics are deliberately deferred.)
+The framework is **composed of three parts**, not a single deliverable:
+
+1. **GitHub Actions workflows** — the execution substrate. *Do as much as
+   possible here alone.*
+2. **A GitHub App** — added only where Actions alone can't suffice. The known
+   driver is the comment-resolution leg (axis 1 above): agent pushes must run
+   under an *App* identity to trigger downstream workflows. Prefer the official
+   `claude` app; a custom App (`create-github-app-token`) is the
+   guaranteed/controllable fallback.
+3. **A guided-configuration CLI** — wires the above together: selects the cost
+   tier, installs/connects the App, sets secrets and guardrails, and generates
+   the workflows for an instance. This is configuration *automation*, not a
+   copyable template. (CLI implementation specifics deferred.)
 
 ---
 
@@ -151,11 +162,13 @@ tiers). What is **not** settled is how a stateless scheduled run actually
 (last-seen hash/timestamp) into the repo so a run diffs the source against it.
 This is the novel half of "continuous" and still needs a real design.
 
-Plus two **assumptions to verify** (see Execution engine above):
-- **A1:** Does the comment-resolution leg require a *custom* GitHub App at
-  Tier 0 (because default-token pushes don't trigger downstream workflows)?
-- **A2:** Do consumer Pro/Max terms permit sustained scheduled/headless use as
-  the framework's *default* operating mode?
+The two earlier assumptions are now closed:
+- **A1 — resolved:** agent pushes must run under a **GitHub App identity** (not
+  the default token) for the comment-resolution leg to fire. Official `claude`
+  app likely suffices; custom App is the guaranteed fallback. Remaining work is
+  a build-time empirical check of *which*, not an architectural unknown.
+- **A2 — accepted:** Pro/Max terms permit headless use for now; assumption
+  accepted, not planning for all contingencies.
 
 ### Q-B. Author-written vs. mechanical impact detection — and when structure must land
 Impact declaration (above) is the *payoff* of linking claims to evidence:
