@@ -136,6 +136,63 @@ The framework is **composed of three parts**, not a single deliverable:
 
 ---
 
+## Data sensing — the continuous core (PROPOSED, not yet settled)
+
+This is the genuinely novel half of "continuous": how a stateless scheduled
+run detects "new data." Grounded in a real candidate instance,
+[`norabble/ai-labor-exposure`](https://github.com/norabble/ai-labor-exposure)
+(BLS OEWS data drops ~yearly around May, but the file location/naming drifts —
+e.g. `special-requests` vs `special.requests`, `all` vs `nat` — so finding it
+is agent-level reasoning, not deterministic code).
+
+### The framework *wraps* an existing pipeline — it does not own it
+`ai-labor-exposure` already has idempotent targets
+(`make download-data → run-pipeline → classify`). So the division of labor:
+
+- **The project provides three hooks:**
+  1. **Sensor** — detect that new data exists *and locate it*.
+  2. **Pipeline entry point** — process it (often already exists, e.g. the
+     `make` targets).
+  3. **Interpretation step** — turn new artifacts into prose / claim updates
+     and an impact declaration. *(This hook is what Q-B specifies — see below.)*
+- **The framework provides:** scheduling, watermark/state plumbing, the
+  PR-proposal mechanism, guardrails, and identity (the Execution engine above).
+
+### The sensor is pluggable across a spectrum
+- **Deterministic** — code: HEAD a pattern-guessed URL, compare a
+  hash / version / ETag / Last-Modified. Cheap.
+- **Agentic** — Claude navigates the source (e.g. the BLS site), reads the
+  release announcement, and locates the moved file when structure drifts.
+- **Two-stage composition (protects Tier-0 quota):** a cheap deterministic
+  trip-wire first; escalate to the agent only when warranted.
+  - *Honest framing:* because the location pattern is unreliable, a
+    pattern-guessed check will often 404 even when new data exists. The cheap
+    check's real job is **confirming "nothing new" cheaply for ~11 months/year**
+    — not avoiding the agent when data actually drops. Cadence should match the
+    data's real rhythm (don't run an expensive agent daily for yearly data).
+
+### Open issue blocking "settled": sensing needs THREE states, not two
+The tempting model — "the watermark lives in the PR, so accept/reject governs
+observed-data state" — is only two-state (on-main vs. in-PR). The system has
+three, and the missing one makes it loop:
+
+| State | Meaning | Risk if the sensor can't see it |
+|---|---|---|
+| **observed-and-merged** | new data accepted into `main` | fine |
+| **proposed-pending** | PR open, not yet merged | re-detect → **duplicate PR** every heartbeat |
+| **seen-and-declined** | author closed the PR ("not yet / looks wrong") | re-detect → **re-proposes forever** |
+
+**Requirement:** before proposing, the sensor must **dedup against open *and*
+closed PRs / branches** (or a persisted declined-marker). A pure
+watermark-on-merge cannot distinguish pending or declined from genuinely new.
+This is the missing piece — not a redesign, but the reason sensing stays
+*proposed*.
+
+*(Deferred to build time: the sensor-contract schema — detection-result
+fields, watermark file format.)*
+
+---
+
 ## Phasing
 
 ### Short term — do as much as possible *inside the GitHub project*
@@ -156,11 +213,11 @@ The framework is **composed of three parts**, not a single deliverable:
 ## Open questions (to resolve next)
 
 ### Q-A (residual). The data-sensing mechanism — the genuinely novel half
-The execution *plumbing* is settled above (runtime, triggers, credential
-tiers). What is **not** settled is how a stateless scheduled run actually
-**detects "new data."** Floated but unconfirmed: commit a small watermark
-(last-seen hash/timestamp) into the repo so a run diffs the source against it.
-This is the novel half of "continuous" and still needs a real design.
+A **proposed design now exists** (see "Data sensing" above): framework-wraps-
+pipeline, a pluggable deterministic↔agentic sensor, two-stage trip-wire. It is
+**not settled** because of one concrete gap: the sensor must represent **three
+states** (merged / pending / declined) and dedup against open & closed PRs, or
+it will duplicate-propose or re-propose forever. Resolve that → sensing closes.
 
 The two earlier assumptions are now closed:
 - **A1 — resolved:** agent pushes must run under a **GitHub App identity** (not
@@ -178,7 +235,9 @@ Impact declaration (above) is the *payoff* of linking claims to evidence:
   → forces the structured hybrid layer in **earlier** than "long-term."
 
 Which mode do we want short-term? The answer sets the timeline for the
-structured layer.
+structured layer. **Note:** Q-B is not independent — it *is* the spec of the
+**interpretation-step hook** surfaced by the Data-sensing design above. Resolve
+them together.
 
 ### Q-C. Framework shape — *resolved* (guided-configuration CLI; see above)
 
