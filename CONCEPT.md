@@ -66,6 +66,63 @@ research efforts are **instances** built on top of it.
 - **Reviewers** — comment on PRs; agents attempt to resolve their comments
   through updates.
 
+### Execution engine (Q-A — plumbing settled; sensing + 2 items still open)
+
+"Continuous" is **not one loop** — it is a set of *(trigger → agent behavior
+→ output)* mappings, each a small independently-triggered workflow sharing a
+common agent toolkit. Settled plumbing:
+
+- **Runtime: GitHub Actions.** Default assumption is **public repos**
+  (unlimited free Actions minutes). Private repos are supported for limited
+  periods on the understanding they stay within the free monthly minute budget
+  (or the instance is funded by an organization). Self-hosted runners remain a
+  free option for either visibility.
+- **Agent engine: `anthropics/claude-code-action@v1`** running inside Actions.
+- **Triggers (untrusted triggers disabled by default):**
+  - Scheduled **cron heartbeat** — poll sources / search literature → open PRs.
+  - Maintainer-only **`workflow_dispatch`** — on-demand runs.
+  - **Comment triggers gated by author-association** (OWNER / MEMBER /
+    COLLABORATOR). Anonymous `@claude` mentions must not be able to spend quota.
+
+**Two independent identity / cost axes — kept separate on purpose:**
+
+1. **GitHub actor** (`github_token`) — *who opens PRs/commits.* Default for
+   mentions is the official `claude` GitHub App. ⚠️ **Verify:** the
+   comment-resolution leg requires that agent-authored PRs/commits *trigger
+   downstream workflows*; pushes made with the default `GITHUB_TOKEN` do **not**
+   (anti-recursion). This likely forces a **custom GitHub App**
+   (`actions/create-github-app-token`) even at Tier 0 — confirm before relying
+   on auto-resolution.
+2. **Claude credential** — *who pays for inference.* Four options, chosen per
+   instance (this is the cost tier; see below). `ANTHROPIC_API_KEY` takes
+   precedence over the OAuth token if both are set — guard against this footgun.
+
+### Cost tiers (default = Tier 0)
+
+- **Tier 0 — Free / subscription-capped (default):** public repo (or
+  self-hosted runner) + **`CLAUDE_CODE_OAUTH_TOKEN`** from the researcher's own
+  Pro/Max subscription. Rate limits act as a hard ceiling, so runaway *dollar*
+  cost is structurally impossible. ⚠️ **Top open risk:** whether consumer
+  Pro/Max terms permit sustained scheduled/headless use as a framework's
+  default operating mode, and the fact that automation shares the same quota
+  the researcher uses interactively.
+- **Tier 1 — Serious researcher (metered API):** `ANTHROPIC_API_KEY` **with an
+  account spending limit set** + higher cadence / parallelism / larger models.
+- **Tier 2 — Funded / org:** Workload Identity Federation service account, or
+  Bedrock / Vertex — organization-funded, centralized, auditable.
+
+**Defense-in-depth against runaway cost (accidental & malicious):** credential
+as ceiling (sub rate-limit, or API spending limit) · trigger gating by
+author-association · per-run `--max-turns` + `timeout-minutes` · `concurrency`
+caps + sane cron frequency · fork-PR secret hygiene.
+
+### Framework shape (was Q-C — resolved)
+
+The framework is delivered as a **guided-configuration CLI**, *not* a copyable
+template. The CLI walks a researcher through tier selection, identity/secret
+setup, guardrails, and workflow generation for their instance. (CLI
+implementation specifics are deliberately deferred.)
+
 ---
 
 ## Phasing
@@ -87,14 +144,18 @@ research efforts are **instances** built on top of it.
 
 ## Open questions (to resolve next)
 
-### Q-A. The execution engine — what actually makes it "continuous"? *(top priority)*
-The data model and governance are specified; the **cadence/trigger/runtime**
-is not. Specifically:
-- **What watches for new data**, and on what schedule or signal?
-- **What runtime runs the agents?** (Candidate: GitHub Actions — native fit.)
-- **What identity opens agent-authored PRs?** (Candidate: a bot/app identity.)
+### Q-A (residual). The data-sensing mechanism — the genuinely novel half
+The execution *plumbing* is settled above (runtime, triggers, credential
+tiers). What is **not** settled is how a stateless scheduled run actually
+**detects "new data."** Floated but unconfirmed: commit a small watermark
+(last-seen hash/timestamp) into the repo so a run diffs the source against it.
+This is the novel half of "continuous" and still needs a real design.
 
-"Continuous" lives or dies here.
+Plus two **assumptions to verify** (see Execution engine above):
+- **A1:** Does the comment-resolution leg require a *custom* GitHub App at
+  Tier 0 (because default-token pushes don't trigger downstream workflows)?
+- **A2:** Do consumer Pro/Max terms permit sustained scheduled/headless use as
+  the framework's *default* operating mode?
 
 ### Q-B. Author-written vs. mechanical impact detection — and when structure must land
 Impact declaration (above) is the *payoff* of linking claims to evidence:
@@ -106,9 +167,7 @@ Impact declaration (above) is the *payoff* of linking claims to evidence:
 Which mode do we want short-term? The answer sets the timeline for the
 structured layer.
 
-### Q-C. Framework shape
-How is "the framework" delivered to an instance? (e.g. template repo,
-GitHub App, reusable Actions/workflows + conventions, a CLI — or a mix.)
+### Q-C. Framework shape — *resolved* (guided-configuration CLI; see above)
 
 ### Q-D. Reviewers: human-only, or also agents?
 Are reviewers strictly human, or do agents also perform (e.g. adversarial /
