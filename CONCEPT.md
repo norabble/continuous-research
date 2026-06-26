@@ -296,6 +296,41 @@ exact annotation grammar.)*
 
 ---
 
+## Provenance & storage (Q-E — SETTLED)
+
+**Storage is the pipeline's decision; the framework *advises*, it does not
+mandate** — with one fixed rule: **results are always committed** (you can't
+review what isn't there). Guiding line:
+
+> **Store what can't be faithfully regenerated; re-obtain what can — but always
+> keep provenance.**
+
+**Default storage policy (tunable by a cost-vs-risk dial):**
+- **Always commit:** results; and **non-deterministic intermediaries** (LLM
+  classifications like bounded / unbounded / adversarial, agent / human
+  judgments) — irreproducible *and* reviewable substance that flows through PRs,
+  not just a cache.
+- **Default skip (re-obtainable):** large inputs from **stable** sources
+  (re-fetch) + **deterministic** intermediaries (re-derive).
+- **Reproducibility dial:** a project needing absolute reproducibility commits
+  even large downloads; the **default leans lean** (don't store large
+  stable-source inputs).
+
+**Provenance ≠ storage — the safety rail.** Whatever you *skip* storing, you
+still **commit a provenance stub**: the **descriptor** (`oews-2026`) + source
+URL + retrieval date + a **content hash**. The hash makes "don't store,
+re-fetch later" *safe* — it catches silent source drift. For stored
+non-deterministic outputs, also record **how the judgment was made** (model /
+version + prompt) so the judgment itself has provenance. Provenance rides the
+**descriptor namespace** (Q-A) and the `edition` field in `results.json` (Q-B).
+
+**Advisory tooling (Phase 2):** a framework **agent skill** reviews a project's
+pipeline and recommends a per-artifact policy — {commit / skip + stub / store} —
+for the chosen cost-vs-risk setting, plus the `.gitignore` + stub conventions.
+Advisory and tunable; never enforced.
+
+---
+
 ## Phasing
 
 **Principle:** essentially every *optional* feature that doesn't require a hook
@@ -330,6 +365,8 @@ with minimal default bodies.**
 - **Consistency-linter** (default-on with the impact layer).
 - **Judgment agent review** (opt-in, off by default; author-driven scope).
 - **`resolves_when`** sensing integration.
+- **Pipeline storage-policy advisor** (Q-E): an agent skill recommending
+  commit / skip + stub / store per a cost-vs-risk dial.
 
 ### Long term — interactivity beyond the repo
 - Publish a **live site** from the GitHub project; richer interactivity a static
@@ -338,7 +375,10 @@ with minimal default bodies.**
 
 ---
 
-## Open questions (to resolve next)
+## Question log (Q-A … Q-E — all resolved)
+
+> The substantive concept design is complete. Each entry below is a resolved
+> pointer into the sections above; build-time specifics are deferred as noted.
 
 ### Q-A. The data-sensing mechanism — *resolved* (see "Data sensing" above)
 Settled: framework-wraps-pipeline; pluggable deterministic↔agentic sensor;
@@ -371,6 +411,9 @@ consistency-linter** is default-on with the impact layer (advisory, not a hard
 gate). **Judgment agent review** is opt-in, off by default, targeted at
 author-driven work. Both are Phase-2 bodies on Phase-1 seams.
 
-### Q-E. Data provenance & reproducibility
-Are data artifacts committed to the repo, regenerated on demand, or both?
-How is the lineage of a data artifact tracked?
+### Q-E. Provenance & storage — *resolved* (see "Provenance & storage" above)
+Storage is the pipeline's call; the framework advises (Phase-2 skill).
+Always commit results + non-deterministic intermediaries; default-skip large
+stable-source inputs + deterministic intermediaries; tunable by a cost-vs-risk
+dial. **Provenance is always kept** (descriptor + source + hash), separate from
+the storage choice, so lineage holds even when bytes aren't stored.
