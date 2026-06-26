@@ -1,8 +1,9 @@
-# Continuous Research Paper — Concept
+# Continuous Research — Concept
 
-> **Status:** Working draft. This document is itself meant to evolve like the
-> thing it describes — settled decisions move up, open questions get resolved
-> and recorded, and the reasoning behind changes is preserved.
+> **Status:** Concept design **complete** — Q-A–Q-E resolved; conceptual
+> decisions are firm, build-time specifics deferred where noted. Still a living
+> document: it evolves like the thing it describes, and the reasoning behind
+> each change is preserved in git history.
 > **Last updated:** 2026-06-26
 
 ## One-line framing
@@ -14,6 +15,47 @@ accepts them through a Git-like review workflow.
 
 We are not building *a* paper. We are building the framework; individual
 research efforts are **instances** built on top of it.
+
+---
+
+## Canonical terms
+
+> One definitional line each, with a pointer to the section that owns the
+> mechanism. These are *handles*, not second copies — never restate a mechanism
+> here. (Same discipline the claim convention uses: structure points, it does
+> not duplicate.)
+
+- **Framework** — this project (the substrate). **Instance** — one research
+  project built on it. (See *One-line framing*.)
+- **Descriptor** — the scheme-assigned identity of one unit of data
+  (`oews-2026`); derived from data *identity*, not location. (See *Data
+  sensing*.)
+- **Label** — `data:<descriptor>` applied to a PR; how dedup queries find it.
+  (See *Data sensing*.)
+- **Edition** — the descriptor of the data a given `results.json` reflects — the
+  *same identity* as the descriptor, on a different surface. (See *Interpretation
+  & impact*.)
+- **data-PR** — a PR proposing new data / findings from the sensing loop
+  (distinct from an author-driven prose PR). (See *Data sensing*.)
+- **Three project hooks** — **sensor**, **pipeline entry point**,
+  **interpretation step** — provided by the instance. (See *Data sensing*.)
+- **`results.json`** — the committed, machine-comparable results artifact; the
+  diffable unit. (See *Interpretation & impact*.)
+- **Impact declaration** — a single change's statement of what is strengthened /
+  weakened / overturned, written into the data-PR. (See *Impact declaration* and
+  *Interpretation & impact*.)
+- **Evolution narrative** — the cross-time, above-PR story of how understanding
+  shifted (concept settled; mechanism deferred). (See *Contradictions & the
+  evolution narrative*.)
+- **Provenance stub** — the always-committed lineage record at
+  `.research/provenance/<descriptor>.json` (descriptor + source + retrieval date
+  + content hash); present even when bulky data is not stored. (See *Provenance
+  & storage*.)
+- **Decline record** — `.research/decisions/<descriptor>.md`, logging a
+  closed-unmerged data-PR's reason; feeds the evolution narrative. (See *Data
+  sensing*.)
+- **Cost tier (0 / 1 / 2)** — which Claude credential pays for inference; Tier 0
+  (subscription) is the default. (See *Cost tiers*.)
 
 ---
 
@@ -44,12 +86,16 @@ research efforts are **instances** built on top of it.
   change means* rather than line-by-line edits — is a feature built **above**
   the raw PR layer, not a replacement for it.
 
-### Impact declaration (provenance of change)
+### Impact declaration
 - The system declares the **practical impact** of a proposed change:
   - what the **old claims** were,
   - what appears to have been **invalidated or revised** by the new data,
     comments, or research,
   - and why.
+- This is the **comprehensive (semantic) view** referred to under *The unit of
+  change* — realized by the interpretation step; see **Interpretation & impact
+  (Q-B)** for the mechanism. (Distinct from Q-E "provenance," which is data
+  *lineage*.)
 
 ### Contradictions & the evolution narrative
 - Contradictions raised by new evidence are surfaced **inside the PR**;
@@ -59,6 +105,10 @@ research efforts are **instances** built on top of it.
   were*, and how the research's understanding has shifted over time.
 - This evolution narrative is a **first-class concept**, distinct from (and a
   level above) the raw Git/PR commit history.
+- **Concept settled; concrete mechanism deferred.** Like the claims graph, it is
+  a *derived* artifact — its raw inputs already exist (merged-PR impact
+  declarations + the decline ledger at `.research/decisions/`). How it is
+  generated and stored is a build-time design, not yet specified.
 
 ### Roles
 - **Managing author** — merge authority; the "official" voice.
@@ -197,7 +247,7 @@ queries — so the signal exists the instant the author acts, with **no race**:
 
 | State | Signal (keyed by descriptor) |
 |---|---|
-| **merged** | data on `main` (e.g. `data/processed/oews-2026/…` exists) or the data-PR is merged |
+| **merged** | the **provenance stub** `.research/provenance/oews-2026.json` exists on `main` (always committed per Q-E), and/or a **merged** PR labeled `data:oews-2026` — *not* the bulk data, which Q-E may legitimately skip storing |
 | **pending** | an **open** PR labeled `data:oews-2026` |
 | **declined** | a **closed-unmerged** PR labeled `data:oews-2026` (`--state closed`, `mergedAt == null`) |
 
@@ -317,12 +367,16 @@ review what isn't there). Guiding line:
   stable-source inputs).
 
 **Provenance ≠ storage — the safety rail.** Whatever you *skip* storing, you
-still **commit a provenance stub**: the **descriptor** (`oews-2026`) + source
-URL + retrieval date + a **content hash**. The hash makes "don't store,
-re-fetch later" *safe* — it catches silent source drift. For stored
-non-deterministic outputs, also record **how the judgment was made** (model /
-version + prompt) so the judgment itself has provenance. Provenance rides the
-**descriptor namespace** (Q-A) and the `edition` field in `results.json` (Q-B).
+still **commit a provenance stub** at a canonical path,
+`.research/provenance/<descriptor>.json`: the **descriptor** (`oews-2026`) +
+source URL + retrieval date + a **content hash**. The hash makes "don't store,
+re-fetch later" *safe* — it catches silent source drift. Because the stub is
+committed as part of the data-PR, it lands on `main` at merge and is therefore
+the **always-present marker the "merged" dedup check reads** (Q-A) — the bulky
+data itself may legitimately not be stored. For stored non-deterministic
+outputs, also record **how the judgment was made** (model / version + prompt) so
+the judgment itself has provenance. Provenance rides the **descriptor
+namespace** (Q-A) and the `edition` field in `results.json` (Q-B).
 
 **Advisory tooling (Phase 2):** a framework **agent skill** reviews a project's
 pipeline and recommends a per-artifact policy — {commit / skip + stub / store} —
@@ -380,12 +434,14 @@ with minimal default bodies.**
 > The substantive concept design is complete. Each entry below is a resolved
 > pointer into the sections above; build-time specifics are deferred as noted.
 
-### Q-A. The data-sensing mechanism — *resolved* (see "Data sensing" above)
-Settled: framework-wraps-pipeline; pluggable deterministic↔agentic sensor;
-three-state dedup keyed off the **data-PR's own state** (race-free); descriptor
-*mechanism* in the framework, *scheme* in the project; decline record
-auto-committed to `main` (deterministic templating) for the narrative, not for
-the loop.
+### Q-A. Execution engine + data sensing — *resolved*
+(see "Execution engine" and "Data sensing" above)
+Settled: GitHub Actions runtime + trigger model + cost tiers (execution
+plumbing); framework-wraps-pipeline; pluggable deterministic↔agentic sensor;
+three-state dedup keyed off the **data-PR's own state** + the always-present
+**provenance stub** (race-free); descriptor *mechanism* in the framework,
+*scheme* in the project; decline record auto-committed to `main` (deterministic
+templating) for the narrative, not for the loop.
 
 The two earlier assumptions are also closed:
 - **A1 — resolved:** agent pushes must run under a **GitHub App identity** (not
