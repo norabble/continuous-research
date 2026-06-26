@@ -66,7 +66,22 @@ research efforts are **instances** built on top of it.
 - **Reviewers** — comment on PRs; agents attempt to resolve their comments
   through updates.
 
-### Execution engine (Q-A — plumbing settled; sensing + 2 items still open)
+### Review (Q-D — settled)
+- **Human review is the spine.** Managing author holds merge authority; human
+  reviewers comment; agents resolve comments. Any agent involvement in review is
+  **additive — it never gates a merge.**
+- **Deterministic consistency-linting** of the Q-B convention (every `backs:`
+  key exists in `results.json`; a claim whose backing result changed had its
+  `status` touched; no orphaned claim ids) is cheap and **default-on whenever
+  the impact layer is enabled** (off when it is). It is **advisory / author-
+  overridable, not a hard merge gate**, to stay consistent with merge authority.
+- **Judgment agent review** (critique of claim support, etc.) is **opt-in, off
+  by default** (it spends Tier-0 quota). Its non-redundant value is on
+  **author-driven** changes — agents already scrutinize agent-authored data-PRs
+  at proposal and act in comment-resolution; reviewing agent-authored work is an
+  explicit opt-in scope, not the default.
+
+### Execution engine (Q-A — settled)
 
 "Continuous" is **not one loop** — it is a set of *(trigger → agent behavior
 → output)* mappings, each a small independently-triggered workflow sharing a
@@ -283,17 +298,42 @@ exact annotation grammar.)*
 
 ## Phasing
 
-### Short term — do as much as possible *inside the GitHub project*
-- Repository as the substrate (markdown + images + data artifacts + pipeline).
-- The PR-based propose/review/merge workflow.
-- Agent-authored PRs driven by new data (monitoring is the minimum viable
-  trigger).
-- Impact declarations and the evolution narrative as repo-native artifacts.
+**Principle:** essentially every *optional* feature that doesn't require a hook
+in the core is built in a **later phase**.
+
+**Corollary (the trap to avoid):** deferring a feature's *body* is fine;
+deferring its *attachment seam* turns "Phase 2" into "rewrite Phase 1." The real
+test: *if deferred, can this attach later without modifying core?* If not, its
+**seam is Phase 1** even when its **body is Phase 2.** So **Phase 1 = the core
+loop + every extension seam a planned optional feature will hang off, shipped
+with minimal default bodies.**
+
+### Phase 1 — core (inside the GitHub project)
+- The data-sensing → PR loop: scheduling, descriptor dedup (three-state),
+  decline records, PR-based propose/review/merge with **human review as
+  authority**.
+- Identity / cost-tier config + guardrails (trigger gating).
+- The guided-configuration CLI to set the above up.
+- **Extension seams shipped now (with minimal default bodies):**
+  - **Interpretation hook contract** (in: new artifacts + PR; out: impact
+    declaration into the PR) — Phase-1 body is **prose-only** impact.
+  - **Config / toggle mechanism** — every disableable Phase-2 feature hangs here.
+  - **PR-event trigger + author-vs-agent actor distinction** — both the linter
+    and judgment-review attach here, and "target author-driven work" depends on
+    this distinction existing now.
+  - **Descriptor namespace** — `resolves_when` hangs off it; keep the Phase-1
+    sensor contract extensible enough for a project to consult claim state later.
+
+### Phase 2 — optional bodies on Phase-1 seams (all disableable)
+- The **mechanical impact layer** (Q-B): `results.json` diff + inline claim
+  convention + derived index — swaps into the interpretation seam.
+- **Consistency-linter** (default-on with the impact layer).
+- **Judgment agent review** (opt-in, off by default; author-driven scope).
+- **`resolves_when`** sensing integration.
 
 ### Long term — interactivity beyond the repo
-- Publish a **live site** generated from the GitHub project.
-- Richer interactive elements that a static repo can't express.
-- Plan should *support both*, but build the GitHub-native layer first and
+- Publish a **live site** from the GitHub project; richer interactivity a static
+  repo can't express. Support both, but build the GitHub-native layer first and
   resist gold-plating toward the site prematurely.
 
 ---
@@ -325,9 +365,11 @@ the whole layer is **disableable per project**, independent of the sensing loop.
 
 ### Q-C. Framework shape — *resolved* (guided-configuration CLI; see above)
 
-### Q-D. Reviewers: human-only, or also agents?
-Are reviewers strictly human, or do agents also perform (e.g. adversarial /
-red-team) review?
+### Q-D. Review — *resolved* (see "Review" above)
+Human review is the spine (never agent-gated). A cheap **deterministic
+consistency-linter** is default-on with the impact layer (advisory, not a hard
+gate). **Judgment agent review** is opt-in, off by default, targeted at
+author-driven work. Both are Phase-2 bodies on Phase-1 seams.
 
 ### Q-E. Data provenance & reproducibility
 Are data artifacts committed to the repo, regenerated on demand, or both?
