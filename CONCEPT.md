@@ -3,7 +3,7 @@
 > **Status:** Working draft. This document is itself meant to evolve like the
 > thing it describes — settled decisions move up, open questions get resolved
 > and recorded, and the reasoning behind changes is preserved.
-> **Last updated:** 2026-06-25
+> **Last updated:** 2026-06-26
 
 ## One-line framing
 
@@ -226,6 +226,61 @@ conventions, any optional observation-note format.)*
 
 ---
 
+## Interpretation & impact (Q-B — SETTLED)
+
+How the interpretation-step hook turns new artifacts into an **impact
+declaration** (old claims → strengthened / weakened / overturned). Impact has
+two layers with very different costs:
+
+1. **Data/results delta — mechanical.** Pipelines emit a machine-comparable
+   **`results.json`** (or the agent writes one when absent); the framework
+   **diffs** it across editions. Free, deterministic, needs no claims graph.
+2. **Claim impact — judgment.** The agent narrates what a delta *means* for the
+   prose, fed the cheap diff rather than the raw artifacts.
+
+### The convention: structure holds only the *linkage*, never the claim
+Prose stays canonical. The claim↔result link rides **inline in the prose** as an
+invisible annotation — single source of truth, grep-able, accretive:
+
+```
+<!-- claim: sector-redistribution-signal | backs: dynamic_sector_corr_economywide | status: supported -->
+```
+
+End-to-end: diff `results.json` → for each changed key, `grep` the prose for
+`backs:.*<key>` → the agent re-examines exactly those passages and writes the
+impact declaration into the data-PR (updating numbers / `status` as part of the
+PR). Contradictions (a result that *overturns* a claim) surface here, where
+accepting the PR accepts them — tying impact to the governance model.
+
+**Graceful degradation:** unannotated claims are simply reasoned over in prose.
+**The "claims graph" is *derived*** — the agent extracts a thin
+`claim_id → result_keys` index from the inline annotations (just as it writes
+`results.json` when absent); it is a cache, never a source of truth, and a
+project can delete it losing nothing.
+
+**Optional extensions** (one line each, not core): `controls: <key>` (a result
+that must stay weak or the claim is threatened); `confirmed_through: <edition>`;
+and the standout **`resolves_when: <edition>`** — an *open* claim names the
+edition that would answer it, so the **sensing loop knows an incoming edition
+resolves a waiting question** (bidirectional, via the same descriptor namespace).
+
+### Disableability — a first-class principle
+This is a complex layer of uncertain reliability in any given project, so it
+**must be disableable per project** via an explicit project-level toggle. When
+off, the framework runs no results-diffing or claim-impact machinery and impact
+is whatever the agent/author writes in plain prose. Disabling the impact layer
+must **not** disable the core sensing → PR loop — they are independent. Lean:
+the mechanical claim layer is **opt-in (conservative default)**, and a project
+that adopts it can turn it off at any time.
+
+> *Generalizes:* any complex/automated component should be independently
+> disableable, with the system degrading gracefully toward manual / prose-first.
+
+*(Deferred to build time: `results.json` schema, the config/toggle file, the
+exact annotation grammar.)*
+
+---
+
 ## Phasing
 
 ### Short term — do as much as possible *inside the GitHub project*
@@ -260,17 +315,13 @@ The two earlier assumptions are also closed:
 - **A2 — accepted:** Pro/Max terms permit headless use for now; assumption
   accepted, not planning for all contingencies.
 
-### Q-B. Author-written vs. mechanical impact detection — and when structure must land
-Impact declaration (above) is the *payoff* of linking claims to evidence:
-- **Author-written impact summaries** → stays prose-first; the hybrid
-  structured layer can stay long-term.
-- **Mechanical impact detection** ("this data change affects these 3 claims")
-  → forces the structured hybrid layer in **earlier** than "long-term."
-
-Which mode do we want short-term? The answer sets the timeline for the
-structured layer. **Note:** Q-B is not independent — it *is* the spec of the
-**interpretation-step hook** surfaced by the Data-sensing design above. Resolve
-them together.
+### Q-B. Interpretation & impact — *resolved* (see "Interpretation & impact" above)
+Settled: two-layer impact (mechanical `results.json` diff + agent-narrated claim
+impact); the claim↔result link rides **inline in the prose** (structure = linkage
+only, never re-states the claim); the claims graph is a *derived* index, not a
+source of truth; structure never forced (accretes, graceful degradation); and
+the whole layer is **disableable per project**, independent of the sensing loop.
+`resolves_when` ties an open claim back to the sensing loop.
 
 ### Q-C. Framework shape — *resolved* (guided-configuration CLI; see above)
 
