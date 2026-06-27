@@ -3,3 +3,5 @@ export * from "./types";
 export * from "./descriptor";
 export * from "./dedup";
 export * from "./ports";
+export * from "./provenance";
+export * from "./decline";
