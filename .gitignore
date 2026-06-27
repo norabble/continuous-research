@@ -1,4 +1,23 @@
+# Dependencies / build / test output
 node_modules/
 dist/
 coverage/
 *.log
+
+# Editor / IDE
+.idea
+.vscode
+
+# Local Claude Code settings (machine-specific)
+.claude/settings.local.json
+
+# Sandbox-injected host config (appear here as /dev/null device nodes)
+.bash_profile
+.bashrc
+.gitconfig
+.gitmodules
+.mcp.json
+.profile
+.ripgreprc
+.zprofile
+.zshrc

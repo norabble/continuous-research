@@ -46,9 +46,9 @@ describe("classify — the three states + new (pure, injected facts)", () => {
 
 describe("classify — precedence and descriptor isolation", () => {
   it("precedence: merged > pending > declined", () => {
-    expect(classify("oews-2026", [pr("closed_unmerged"), pr("open"), pr("merged")], false).state).toBe(
-      "merged",
-    );
+    expect(
+      classify("oews-2026", [pr("closed_unmerged"), pr("open"), pr("merged")], false).state,
+    ).toBe("merged");
     expect(classify("oews-2026", [pr("closed_unmerged"), pr("open")], false).state).toBe("pending");
   });
 
@@ -65,11 +65,11 @@ describe("dedupe — orchestrates the port, then classifies", () => {
   it("queries by label + stub existence and returns the classification", async () => {
     const calls: string[] = [];
     const fake: GitHubPort = {
-      listPullRequestsByLabel: async (label) => {
+      listPullRequestsByLabel: (label) => {
         calls.push(label);
-        return label === "data:oews-2026" ? [pr("open")] : [];
+        return Promise.resolve(label === "data:oews-2026" ? [pr("open")] : []);
       },
-      provenanceStubExists: async () => false,
+      provenanceStubExists: () => Promise.resolve(false),
     };
     const r = await dedupe(fake, "oews-2026");
     expect(calls).toEqual(["data:oews-2026"]);
@@ -78,8 +78,8 @@ describe("dedupe — orchestrates the port, then classifies", () => {
 
   it("respects the provenance stub from the port (merged)", async () => {
     const fake: GitHubPort = {
-      listPullRequestsByLabel: async () => [],
-      provenanceStubExists: async () => true,
+      listPullRequestsByLabel: () => Promise.resolve([]),
+      provenanceStubExists: () => Promise.resolve(true),
     };
     expect((await dedupe(fake, "oews-2026")).state).toBe("merged");
   });
