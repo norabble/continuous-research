@@ -29,5 +29,8 @@
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.62.0",
     "vitest": "^4.1.9"
+  },
+  "dependencies": {
+    "octokit": "^5.0.5"
   }
 }

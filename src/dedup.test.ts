@@ -10,6 +10,23 @@ const pr = (state: PrState, descriptor = "oews-2026"): PullRequest => ({
   labels: [`data:${descriptor}`],
 });
 
+/** A full GitHubPort with inert defaults; write methods reject so accidental use surfaces. */
+function portWith(overrides: Partial<GitHubPort>): GitHubPort {
+  const notImplemented = (name: string) => (): Promise<never> =>
+    Promise.reject(new Error(`${name} not implemented in this fake`));
+  return {
+    listPullRequestsByLabel: () => Promise.resolve([]),
+    provenanceStubExists: () => Promise.resolve(false),
+    defaultBranch: () => Promise.resolve("main"),
+    branchHeadSha: () => Promise.resolve("sha"),
+    createBranch: notImplemented("createBranch"),
+    putFile: notImplemented("putFile"),
+    openPullRequest: notImplemented("openPullRequest"),
+    addLabels: notImplemented("addLabels"),
+    ...overrides,
+  };
+}
+
 describe("classify — the three states + new (pure, injected facts)", () => {
   it("new: no PRs, no stub → propose", () => {
     expect(classify("oews-2026", [], false)).toEqual({
@@ -64,23 +81,19 @@ describe("classify — precedence and descriptor isolation", () => {
 describe("dedupe — orchestrates the port, then classifies", () => {
   it("queries by label + stub existence and returns the classification", async () => {
     const calls: string[] = [];
-    const fake: GitHubPort = {
+    const fake = portWith({
       listPullRequestsByLabel: (label) => {
         calls.push(label);
         return Promise.resolve(label === "data:oews-2026" ? [pr("open")] : []);
       },
-      provenanceStubExists: () => Promise.resolve(false),
-    };
+    });
     const r = await dedupe(fake, "oews-2026");
     expect(calls).toEqual(["data:oews-2026"]);
     expect(r.state).toBe("pending");
   });
 
   it("respects the provenance stub from the port (merged)", async () => {
-    const fake: GitHubPort = {
-      listPullRequestsByLabel: () => Promise.resolve([]),
-      provenanceStubExists: () => Promise.resolve(true),
-    };
+    const fake = portWith({ provenanceStubExists: () => Promise.resolve(true) });
     expect((await dedupe(fake, "oews-2026")).state).toBe("merged");
   });
 });
