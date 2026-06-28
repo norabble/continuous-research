@@ -1,6 +1,7 @@
 # Dependencies / build / test output
 node_modules/
 dist/
+bundle/
 coverage/
 *.log
 
