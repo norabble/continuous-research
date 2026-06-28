@@ -17,6 +17,7 @@ function portWith(overrides: Partial<GitHubPort>): GitHubPort {
   return {
     listPullRequestsByLabel: () => Promise.resolve([]),
     provenanceStubExists: () => Promise.resolve(false),
+    latestComment: () => Promise.resolve(null),
     defaultBranch: () => Promise.resolve("main"),
     branchHeadSha: () => Promise.resolve("sha"),
     createBranch: notImplemented("createBranch"),

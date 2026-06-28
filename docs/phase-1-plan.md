@@ -185,21 +185,20 @@ Triggered on `pull_request: closed` (unmerged) carrying a `data:` label.
 - Resolve descriptor (from the label), reason, `declinedAt`, `prNumber`,
   `declinedBy` from the event payload, then `recordDecline` (commit to `main`).
 
-### Running the (unpublished) engine in CI (decision 5 — needs sign-off)
+### Running the (unpublished) engine in CI (decision 5 — resolved: deferred)
 
-The workflow must invoke the engine, but it isn't published — which also forces
-a small prerequisite: **wire the CLI `bin` + a `tsc` build** so the package runs
-as a command (today it is `tsx`-only dev). Distribution options:
+The workflow must invoke the engine, but it isn't published — which forces a
+small prerequisite either way: **wire the CLI `bin` + a `tsc` build** so the
+package runs as a command (today it is `tsx`-only dev).
 
-- **(recommended) Make the framework repo public**, then the sample workflow
-  runs `npx github:norabble/continuous-research` (or a git dependency). The repo
-  is shaped, is meant to be open, and going public unblocks the natural B/C
-  distribution with zero auth friction — consistent with CONCEPT's public-repo
-  default.
-- Keep private + publish `0.0.x` to npm; **or** keep private + have the sample
-  workflow check out the framework repo with a PAT/App token and build it.
-
-The recommended path needs a one-time **decision to make the framework public.**
+**Resolved:** the distribution choice is **deferred** — it only bites when the
+sample's CI is wired (end of step 5). All step-5 *engine* code is built with the
+repo **private**. When we run the skeleton before going public, use **option 3**
+(sample workflow checks out the framework repo with a read-only PAT and builds
+it). Going **public** — which makes `npx github:norabble/continuous-research`
+frictionless — happens **only on the maintainer's explicit say-so** (the concern
+is profile-noise, not secrecy). Alternative if/when public is undesirable but a
+cleaner consumption path is wanted: publish `0.0.x` to npm.
 
 ### Workflows (thin, generated)
 

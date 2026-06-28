@@ -7,3 +7,6 @@ export * from "./provenance";
 export * from "./decline";
 export * from "./github";
 export * from "./flows";
+export * from "./config";
+export * from "./sensor";
+export * from "./commands";

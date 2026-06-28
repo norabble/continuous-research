@@ -30,6 +30,8 @@ export interface GitHubPort {
   listPullRequestsByLabel(label: string): Promise<PullRequest[]>;
   /** Whether this descriptor's provenance stub exists on the default branch. */
   provenanceStubExists(descriptor: Descriptor): Promise<boolean>;
+  /** The most recent comment body on a PR, or null if there are none. */
+  latestComment(prNumber: number): Promise<string | null>;
 
   // --- repo info ---
   defaultBranch(): Promise<string>;

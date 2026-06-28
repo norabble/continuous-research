@@ -103,6 +103,16 @@ export class OctokitGitHubPort implements GitHubPort {
     }
   }
 
+  async latestComment(prNumber: number): Promise<string | null> {
+    const comments = await this.octokit.paginate(this.octokit.rest.issues.listComments, {
+      owner: this.owner,
+      repo: this.repo,
+      issue_number: prNumber,
+      per_page: 100,
+    });
+    return comments.at(-1)?.body ?? null;
+  }
+
   async defaultBranch(): Promise<string> {
     const { data } = await this.octokit.rest.repos.get({ owner: this.owner, repo: this.repo });
     return data.default_branch;
