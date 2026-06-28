@@ -127,9 +127,18 @@ contradiction fix is proven. That is the skeleton's #1 job.
 ## Step 5 — detailed design
 
 The skeleton runs in a **dedicated sample repo** (the genuine reference
-instance, name TBD), started with a **deterministic** sensor so the plumbing is
-proven before real data or Claude. The real crypto pipeline + agentic sensor
-arrive at **step 7** in the *same* repo.
+instance, `norabble/continuous-research-sample`), started with a
+**deterministic** sensor so the plumbing is proven before real data or Claude.
+The real crypto pipeline + agentic sensor arrive at **step 7** in the *same*
+repo.
+
+> **Status (validated):** the engine ran end-to-end *locally* against the sample
+> repo — all three dedup states (new→propose, pending, merged-via-stub) plus the
+> decline record committed to `main`. CI is wired (vendored engine +
+> `sense` / `decline` workflows on the sample's `main`) but **deferred**: the
+> norabble org blocks the `GITHUB_TOKEN` from opening PRs, so CI PR-creation
+> resumes at **step 8** via the App identity (a non-`GITHUB_TOKEN` actor, which
+> also enables comment-resolution). See Watch-items.
 
 ### Sample subject (locked)
 
@@ -254,3 +263,8 @@ starts with a deterministic sensor at step 5 and gains the real crypto pipeline
 - **2026 Actions secret-scoping** change — affects how workflows pass
   credentials (the Claude token + App token).
 - **Tier-0 ToS** assumption (CONCEPT A2) — accepted for now.
+- **norabble org blocks Actions-created PRs** (the `GITHUB_TOKEN` cannot open
+  PRs org-wide). The engine is validated **locally** end-to-end meanwhile; CI
+  PR-creation resumes at **step 8**, where the App identity (not the
+  `GITHUB_TOKEN`) both enables comment-resolution and bypasses this block.
+  Alternatives if needed sooner: enable the org setting, or a scoped write PAT.
