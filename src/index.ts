@@ -10,3 +10,4 @@ export * from "./flows";
 export * from "./config";
 export * from "./sensor";
 export * from "./commands";
+export * from "./scaffold";

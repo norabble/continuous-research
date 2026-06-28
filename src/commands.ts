@@ -14,6 +14,7 @@ import { parseDetectionResult } from "./sensor";
 import { dedupe } from "./dedup";
 import { buildProvenanceStub } from "./provenance";
 import { proposeDataPR, recordDecline } from "./flows";
+import { scaffoldFiles } from "./scaffold";
 
 export type SenseOutcome =
   | { action: "none"; reason: string }
@@ -71,4 +72,22 @@ export async function runRecordDecline(deps: RecordDeclineDeps): Promise<void> {
     prNumber: deps.prNumber,
     declinedBy: deps.declinedBy,
   });
+}
+
+export interface InitDeps {
+  /** Writes the file if absent; resolves true if written, false if it existed. */
+  writeIfAbsent: (path: string, content: string) => Promise<boolean>;
+}
+
+export interface InitResultEntry {
+  path: string;
+  created: boolean;
+}
+
+export async function runInit(deps: InitDeps): Promise<InitResultEntry[]> {
+  const results: InitResultEntry[] = [];
+  for (const file of scaffoldFiles()) {
+    results.push({ path: file.path, created: await deps.writeIfAbsent(file.path, file.content) });
+  }
+  return results;
 }

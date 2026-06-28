@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { runSense, runRecordDecline } from "./commands";
+import { runSense, runRecordDecline, runInit } from "./commands";
 import type { GitHubPort } from "./ports";
 
 /** A full GitHubPort with succeeding inert defaults; override per test. */
@@ -107,5 +107,25 @@ describe("runRecordDecline", () => {
       declinedAt: "2026-06-27T00:00:00Z",
     });
     expect(committed).toContain("Closed without merge");
+  });
+});
+
+describe("runInit", () => {
+  it("writes every scaffold file and reports created vs existing", async () => {
+    const written: string[] = [];
+    const existing = new Set([".research/config.json"]);
+    const results = await runInit({
+      writeIfAbsent: (path, _content) => {
+        if (existing.has(path)) return Promise.resolve(false);
+        written.push(path);
+        return Promise.resolve(true);
+      },
+    });
+    expect(results).toEqual([
+      { path: ".research/config.json", created: false },
+      { path: ".github/workflows/sense.yml", created: true },
+      { path: ".github/workflows/decline.yml", created: true },
+    ]);
+    expect(written).toEqual([".github/workflows/sense.yml", ".github/workflows/decline.yml"]);
   });
 });

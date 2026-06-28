@@ -7,11 +7,33 @@
  * hands them to the injectable command logic in `commands.ts`.
  */
 
-import { readFile } from "node:fs/promises";
+import { access, mkdir, readFile, writeFile } from "node:fs/promises";
+import { dirname } from "node:path";
 import { parseConfig } from "./config";
-import { runSense, runRecordDecline } from "./commands";
+import { runSense, runRecordDecline, runInit } from "./commands";
+import { NEXT_STEPS } from "./scaffold";
 import { execSensor, readArtifact, createGitHubPortFromEnv } from "./io";
 import { extractDeclineFromEvent } from "./event";
+
+async function writeIfAbsent(path: string, content: string): Promise<boolean> {
+  try {
+    await access(path);
+    return false;
+  } catch {
+    await mkdir(dirname(path), { recursive: true });
+    await writeFile(path, content);
+    return true;
+  }
+}
+
+async function cmdInit(): Promise<number> {
+  const results = await runInit({ writeIfAbsent });
+  for (const r of results) {
+    console.log(`[init] ${r.created ? "created" : "exists "} ${r.path}`);
+  }
+  console.log(NEXT_STEPS);
+  return 0;
+}
 
 async function cmdSense(): Promise<number> {
   const config = parseConfig(await readFile(".research/config.json", "utf8"));
@@ -37,6 +59,7 @@ async function cmdRecordDecline(): Promise<number> {
 }
 
 const COMMANDS: Record<string, () => Promise<number>> = {
+  init: cmdInit,
   sense: cmdSense,
   "record-decline": cmdRecordDecline,
 };
@@ -45,7 +68,7 @@ async function main(): Promise<number> {
   const command = process.argv[2];
   if (!command || command === "--help" || command === "-h") {
     console.log("continuous-research <command>");
-    console.log(`commands: ${Object.keys(COMMANDS).join(", ")} (init, propose: not yet)`);
+    console.log(`commands: ${Object.keys(COMMANDS).join(", ")} (propose: not yet)`);
     return 0;
   }
   const handler = COMMANDS[command];
