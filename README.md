@@ -24,12 +24,17 @@ The system is split into **two layers, on purpose**:
 
 Both run inside **GitHub Actions workflows**, which provide the triggers:
 
-| Workflow              | Trigger              | What runs                                                       | Layer  |
-| --------------------- | -------------------- | --------------------------------------------------------------- | ------ |
-| `sense`               | schedule / dispatch  | sensor → dedup → (if new) pipeline + open the data-PR           | engine |
-| _interpretation_      | a new data-PR        | **read the new data + claims → write the impact declaration**   | agent  |
-| `decline`             | PR closed-unmerged   | commit the decline record to `main`                             | engine |
-| _comment-resolution_  | a reviewer comment   | attempt to address the comment on the PR                        | agent  |
+| Workflow             | Trigger             | What runs                                                 | Layer  | Status      |
+| -------------------- | ------------------- | --------------------------------------------------------- | ------ | ----------- |
+| `sense`              | schedule / dispatch | sensor → dedup → (if new) pipeline + open the data-PR     | engine | **built**   |
+| `decline`            | PR closed-unmerged  | commit the decline record to `main`                       | engine | **built**   |
+| _interpretation_     | a new data-PR       | read the new data + claims → write the impact declaration | agent  | _planned_   |
+| _comment-resolution_ | a reviewer comment  | attempt to address the comment on the PR                  | agent  | _planned_   |
+
+The **agent layer is entirely planned, not yet implemented** — there is **no
+`claude-code-action` invocation anywhere in this repo or the sample**. Only the
+two engine workflows exist today; the agent rows are shown for the intended
+shape.
 
 ### Your question: how is inference on the produced data invoked?
 
@@ -44,8 +49,10 @@ data into a PR _deterministically_; deciding what it _means_ is the agent's job.
 > end-to-end** against real GitHub. The agentic interpretation is **not wired
 > yet**: today a data-PR carries a _templated_ impact stub, and the
 > `claude-code-action` step that performs the real inference is upcoming work
-> (it pairs with the bot identity / CI, plan steps 7–8). So no LLM inference
-> currently runs in CI — it has only been exercised manually.
+> (it pairs with the bot identity / CI, plan steps 7–8). **There is no
+> `claude-code-action` invocation anywhere in the repo today**; the only
+> inference run so far was a manual probe. So no LLM inference currently runs in
+> CI.
 
 ## Instance layout
 
