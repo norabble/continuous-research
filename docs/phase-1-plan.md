@@ -20,9 +20,17 @@ later with the maintainer).
   CLI *and* the runtime engine; thin generated workflows call it. (Rationale and
   the rejected reusable-workflow route: see the conversation that produced this
   plan — chiefly *local testability* of the novel logic.)
-- **Language = TypeScript / Node** — matches the Actions ecosystem, `npx`
-  distribution, and `claude-code-action`; independent of an instance's own
-  pipeline language (the framework wraps any pipeline via hooks).
+- **Language = TypeScript / Node** — matches the Actions ecosystem and `npx`
+  distribution; independent of an instance's own pipeline language (the
+  framework wraps any pipeline via hooks).
+- **Agent layer = GitHub Agentic Workflows (`gh-aw`)** — agent behaviors are
+  markdown workflows compiled to Actions via `gh aw compile`; the agent runs
+  read-only and writes only through sanitized `safe-outputs`
+  (`push-to-pull-request-branch` onto the engine's data-PR). Chosen over
+  `anthropics/claude-code-action` (which insists on creating its own branch/PR,
+  colliding with the engine-owned `data/<descriptor>` branch + label) and over
+  hand-wiring the base action. Consequence: **the App identity is now required
+  for interpretation to trigger at all** (see step 8).
 
 ## Architecture
 
@@ -31,8 +39,9 @@ later with the maintainer).
   - the **runtime engine** — subcommands the workflows invoke (`sense`,
     `propose`, `record-decline`, …).
 - **Thin generated workflows** in the instance repo call those subcommands;
-  `anthropics/claude-code-action@v1` runs the agent steps. (A reusable-workflow
-  / composite-action front door is a deferrable ergonomic layer — *not* Phase 1.)
+  **gh-aw agentic workflows** (markdown, compiled with `gh aw compile`) run the
+  agent steps. (A reusable-workflow / composite-action front door is a
+  deferrable ergonomic layer — *not* Phase 1.)
 - **Instance conventions** under `.research/`: `config` (tier, identity,
   toggles, hook declarations); `provenance/<descriptor>.json`;
   `decisions/<descriptor>.md`.
@@ -47,12 +56,14 @@ later with the maintainer).
    I/O behind a port (ports-and-adapters). If GitHub calls are inlined into the
    classifier, "test locally" collapses to CI-only — the exact failure B/C was
    chosen to avoid.
-2. **Hooks are declared, not discovered.** The instance declares its three hooks
-   in `.research/config` as commands the engine runs — e.g.
-   `sensor: "node sensor.js"`, `pipeline: "make download-data run-pipeline"`,
-   `interpretation: "…"`. The *existence* of this declaration is Phase 1; the
-   exact schema is deferred. This declaration *is* the "framework wraps the
-   pipeline" seam.
+2. **Hooks are declared, not discovered.** The instance declares its hooks in
+   `.research/config`. **Sensor and pipeline are commands the engine runs** —
+   e.g. `sensor: "node sensor.js"`,
+   `pipeline: "make download-data run-pipeline"`. **Interpretation is NOT an
+   engine-run command** — it is a **gh-aw workflow** in the instance repo,
+   triggered by the data-PR (which is why the PR must be opened under the App
+   identity). The *existence* of these declarations is Phase 1; exact schema
+   deferred. This declaration *is* the "framework wraps the pipeline" seam.
 3. **Prototype CLI stays minimal.** First iteration: the CLI only scaffolds
    `.research/` + the workflows. Credential / identity / App setup is
    *documented manual steps*. A fully guided `init` is later work and must not
@@ -116,13 +127,21 @@ contradiction fix is proven. That is the skeleton's #1 job.
    the sample repo; run the three-state scenario above. _(See "Step 5 — detailed
    design" below.)_
 6. **CLI scaffold** — `.research/` + workflow generation (minimal, per rule 3).
-7. **Agentic sensor + prose interpretation body** — `claude-code-action`; swap
-   the templated interpretation stub for the prose-agent body.
-8. **Comment-resolution** — workflow + the **empirical A1 check** (official
-   `claude` app vs a custom App for downstream triggers). If A1 forces a custom
-   App, that setup cost lands *here* — it must not block the skeleton.
+7. **Interpretation via gh-aw** _(depends on step 8's App identity — the
+   dependency is inverted from the original ordering)_ — author the
+   interpretation agentic workflow in markdown (trigger: the labeled data-PR;
+   read-only + `push-to-pull-request-branch` safe-output; Claude engine),
+   compile with `gh aw compile`, and swap the templated impact stub for the
+   real agent-written impact declaration. Also: the real (network) BTC-USD
+   sensor replaces the deterministic stand-in. _(Value already probed manually
+   — the impact-declaration output was judged mergeable for the sample.)_
+8. **App identity** — create/install a custom GitHub App
+   (`create-github-app-token`); switch the engine's data-PR writes to the App
+   token. Now **required before step 7**: gh-aw interpretation triggers off the
+   data-PR, and `GITHUB_TOKEN`-opened PRs don't trigger downstream workflows.
+   Comment-resolution (a second gh-aw workflow) rides the same identity.
 9. **Guardrail hardening** — gating, max-turns, timeouts, concurrency, fork-PR
-   hygiene.
+   hygiene; pin the gh-aw version.
 
 ## Step 5 — detailed design
 
@@ -132,13 +151,14 @@ instance, `norabble/continuous-research-sample`), started with a
 The real crypto pipeline + agentic sensor arrive at **step 7** in the *same*
 repo.
 
-> **Status (validated):** the engine ran end-to-end *locally* against the sample
+> **Status (complete):** the engine ran end-to-end *locally* against the sample
 > repo — all three dedup states (new→propose, pending, merged-via-stub) plus the
-> decline record committed to `main`. CI is wired (vendored engine +
-> `sense` / `decline` workflows on the sample's `main`) but **deferred**: the
-> norabble org blocks the `GITHUB_TOKEN` from opening PRs, so CI PR-creation
-> resumes at **step 8** via the App identity (a non-`GITHUB_TOKEN` actor, which
-> also enables comment-resolution). See Watch-items.
+> decline record committed to `main` — and then **in CI**: after the org enabled
+> "Allow GitHub Actions to create and approve pull requests," a dispatched
+> `sense` run opened a data-PR (sample PR #3) with the default `GITHUB_TOKEN`
+> (vendored engine bundle). Remaining caveat: default-token PRs don't trigger
+> downstream workflows, so the **App identity (step 8) is still required** for
+> the gh-aw interpretation workflow to fire.
 
 ### Sample subject (locked)
 
@@ -259,12 +279,17 @@ starts with a deterministic sensor at step 5 and gains the real crypto pipeline
 
 ## Watch-items (track, don't block)
 
-- **A1** — official vs custom App; resolved empirically at step 8.
+- **A1** — now settled by the gh-aw decision: a custom App identity is
+  *required* for the data-PR to trigger the interpretation workflow (step 8
+  precedes step 7).
+- **gh-aw maturity** — preview-stage (GitHubNext); once retired releases over a
+  billing-impacting bug. Pin the version; keep per-run caps
+  (max-turns/timeouts) regardless — this framework's thesis is bounded cost.
 - **2026 Actions secret-scoping** change — affects how workflows pass
-  credentials (the Claude token + App token).
+  credentials (the agent token + App token).
 - **Tier-0 ToS** assumption (CONCEPT A2) — accepted for now.
-- **norabble org blocks Actions-created PRs** (the `GITHUB_TOKEN` cannot open
-  PRs org-wide). The engine is validated **locally** end-to-end meanwhile; CI
-  PR-creation resumes at **step 8**, where the App identity (not the
-  `GITHUB_TOKEN`) both enables comment-resolution and bypasses this block.
-  Alternatives if needed sooner: enable the org setting, or a scoped write PAT.
+- ~~norabble org blocks Actions-created PRs~~ **Resolved:** the org setting
+  "Allow GitHub Actions to create and approve pull requests" was enabled;
+  CI opened a data-PR with the default `GITHUB_TOKEN` (sample PR #3). Note
+  this default-token path still doesn't trigger downstream workflows — the
+  App identity (step 8) remains required for interpretation.

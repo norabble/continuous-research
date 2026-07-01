@@ -142,27 +142,36 @@ common agent toolkit. Settled plumbing:
   periods on the understanding they stay within the free monthly minute budget
   (or the instance is funded by an organization). Self-hosted runners remain a
   free option for either visibility.
-- **Agent engine: `anthropics/claude-code-action@v1`** running inside Actions.
+- **Agent engine: GitHub Agentic Workflows (`gh-aw`)** — agent behaviors are
+  authored as markdown workflows (frontmatter: triggers, permissions, tools,
+  safe-outputs) and compiled to Actions YAML via `gh aw compile`. The agent runs
+  **read-only**; writes happen only through sanitized **`safe-outputs`** (e.g.
+  `push-to-pull-request-branch` onto an existing data-PR) performed by a trusted
+  separate step — which directly serves the runaway-cost/abuse posture.
+  Engine-agnostic (Claude / Copilot / Codex / Gemini); we default to Claude.
+  ⚠️ *Maturity watch-item:* gh-aw is preview-stage and once retired releases
+  over a billing-impacting bug — pin versions, keep per-run caps regardless.
 - **Triggers (untrusted triggers disabled by default):**
   - Scheduled **cron heartbeat** — poll sources / search literature → open PRs.
   - Maintainer-only **`workflow_dispatch`** — on-demand runs.
-  - **Comment triggers gated by author-association** (OWNER / MEMBER /
-    COLLABORATOR). Anonymous `@claude` mentions must not be able to spend quota.
+  - **Comment/mention triggers gated by author-association** (OWNER / MEMBER /
+    COLLABORATOR). Anonymous mentions must not be able to spend quota.
 
 **Two independent identity / cost axes — kept separate on purpose:**
 
 1. **GitHub actor** (`github_token`) — *who opens PRs/commits.* Hard
-   requirement: agent pushes must run under a **GitHub App identity, not the
-   default `GITHUB_TOKEN`** — GITHUB_TOKEN pushes do **not** trigger downstream
-   workflows (anti-recursion), which would silently break the
-   comment-resolution leg. The official `claude` app appears to satisfy this; a
-   custom App via `create-github-app-token` is the guaranteed, controllable
-   path (and what Anthropic's own advanced examples use). Either way it is "an
-   App," so this does not change the architecture — *which* app suffices is a
-   build-time empirical check.
-2. **Claude credential** — *who pays for inference.* Four options, chosen per
-   instance (this is the cost tier; see below). `ANTHROPIC_API_KEY` takes
-   precedence over the OAuth token if both are set — guard against this footgun.
+   requirement, now **load-bearing for interpretation, not just
+   comment-resolution**: with gh-aw, interpretation is a *separate workflow
+   triggered by the data-PR*, and PRs opened with the default `GITHUB_TOKEN` do
+   **not** trigger downstream workflows (anti-recursion). So the engine must
+   open data-PRs under an **App/PAT identity** for the agent layer to fire at
+   all. A custom App via `create-github-app-token` is the guaranteed,
+   controllable path.
+2. **Agent credential** — *who pays for inference.* Chosen per instance (this
+   is the cost tier; see below). gh-aw is engine-agnostic, so the credential may
+   be a Claude subscription/API key — or a Copilot subscription if the
+   researcher has one. `ANTHROPIC_API_KEY` takes precedence over the OAuth token
+   if both are set — guard against this footgun.
 
 ### Cost tiers (default = Tier 0)
 
@@ -214,12 +223,17 @@ is agent-level reasoning, not deterministic code).
 `ai-labor-exposure` already has idempotent targets
 (`make download-data → run-pipeline → classify`). So the division of labor:
 
-- **The project provides three hooks:**
-  1. **Sensor** — detect that new data exists *and locate it*.
+- **The project provides three hooks** — the first two are *commands the
+  engine runs*; the third is *a gh-aw agentic workflow*, not an engine-run
+  command:
+  1. **Sensor** — detect that new data exists *and locate it*. (Engine-run
+     command.)
   2. **Pipeline entry point** — process it (often already exists, e.g. the
-     `make` targets).
+     `make` targets). (Engine-run command.)
   3. **Interpretation step** — turn new artifacts into prose / claim updates
-     and an impact declaration. *(This hook is what Q-B specifies — see below.)*
+     and an impact declaration. Realized as a **gh-aw workflow** triggered by
+     the data-PR, writing back via the sanitized `push-to-pull-request-branch`
+     safe-output. *(This hook is what Q-B specifies — see below.)*
 - **The framework provides:** scheduling, **descriptor state plumbing**
   (read / store / tag / query by descriptor), the PR-proposal mechanism,
   guardrails, and identity (the Execution engine above).
@@ -294,8 +308,11 @@ conventions, any optional observation-note format.)*
 ## Interpretation & impact (Q-B — SETTLED)
 
 How the interpretation-step hook turns new artifacts into an **impact
-declaration** (old claims → strengthened / weakened / overturned). Impact has
-two layers with very different costs:
+declaration** (old claims → strengthened / weakened / overturned).
+**Realization:** a **gh-aw agentic workflow** triggered by the data-PR — the
+agent reads the new results + prose read-only and writes the impact declaration
+onto the data-PR branch via the `push-to-pull-request-branch` safe-output.
+Impact has two layers with very different costs:
 
 1. **Data/results delta — mechanical.** Pipelines emit a machine-comparable
    **`results.json`** (or the agent writes one when absent); the framework
@@ -405,7 +422,8 @@ with minimal default bodies.**
 - The guided-configuration CLI to set the above up.
 - **Extension seams shipped now (with minimal default bodies):**
   - **Interpretation hook contract** (in: new artifacts + PR; out: impact
-    declaration into the PR) — Phase-1 body is **prose-only** impact.
+    declaration into the PR) — Phase-1 body is **prose-only** impact, delivered
+    by a **gh-aw workflow** on the data-PR (requires the App-identity actor).
   - **Config / toggle mechanism** — every disableable Phase-2 feature hangs here.
   - **PR-event trigger + author-vs-agent actor distinction** — both the linter
     and judgment-review attach here, and "target author-driven work" depends on
@@ -444,16 +462,19 @@ three-state dedup keyed off the **data-PR's own state** + the always-present
 templating) for the narrative, not for the loop.
 
 The two earlier assumptions are also closed:
-- **A1 — resolved:** agent pushes must run under a **GitHub App identity** (not
-  the default token) for the comment-resolution leg to fire. Official `claude`
-  app likely suffices; custom App is the guaranteed fallback. Remaining work is
-  a build-time empirical check of *which*, not an architectural unknown.
+- **A1 — resolved, and upgraded by the gh-aw decision:** the engine must open
+  data-PRs under an **App/PAT identity** (not the default token) — originally
+  for comment-resolution, now also because the gh-aw **interpretation** workflow
+  is triggered by the data-PR and won't fire on `GITHUB_TOKEN`-opened PRs. A
+  custom App via `create-github-app-token` is the guaranteed path.
 - **A2 — accepted:** Pro/Max terms permit headless use for now; assumption
   accepted, not planning for all contingencies.
 
 ### Q-B. Interpretation & impact — *resolved* (see "Interpretation & impact" above)
 Settled: two-layer impact (mechanical `results.json` diff + agent-narrated claim
-impact); the claim↔result link rides **inline in the prose** (structure = linkage
+impact), realized as a **gh-aw workflow** on the data-PR (safe-output
+`push-to-pull-request-branch`); the claim↔result link rides **inline in the
+prose** (structure = linkage
 only, never re-states the claim); the claims graph is a *derived* index, not a
 source of truth; structure never forced (accretes, graceful degradation); and
 the whole layer is **disableable per project**, independent of the sensing loop.

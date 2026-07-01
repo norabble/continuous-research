@@ -18,9 +18,13 @@ The system is split into **two layers, on purpose**:
    detect new data, dedup against existing PRs, open the data-PR, record
    declines. **No LLM inference happens here** — it is deterministic and
    unit-tested.
-2. **The agent / inference layer** — `anthropics/claude-code-action` running
-   Claude. This is where **inference on the produced data** happens: the
-   _interpretation step_ and _comment-resolution_.
+2. **The agent / inference layer** —
+   [GitHub Agentic Workflows (`gh-aw`)](https://github.com/github/gh-aw):
+   markdown-authored agentic workflows, compiled to Actions, running Claude.
+   The agent executes **read-only**; its writes land only through sanitized
+   `safe-outputs` (e.g. pushing onto an existing data-PR branch). This is where
+   **inference on the produced data** happens: the _interpretation step_ and
+   _comment-resolution_.
 
 Both run inside **GitHub Actions workflows**, which provide the triggers:
 
@@ -32,27 +36,29 @@ Both run inside **GitHub Actions workflows**, which provide the triggers:
 | _comment-resolution_ | a reviewer comment  | attempt to address the comment on the PR                  | agent  | _planned_   |
 
 The **agent layer is entirely planned, not yet implemented** — there is **no
-`claude-code-action` invocation anywhere in this repo or the sample**. Only the
-two engine workflows exist today; the agent rows are shown for the intended
-shape.
+gh-aw workflow anywhere in this repo or the sample yet**. Only the two engine
+workflows exist today; the agent rows are shown for the intended shape.
 
-### Your question: how is inference on the produced data invoked?
+### How is inference on the produced data invoked?
 
 **The engine never calls an LLM.** Inference on the produced data is the
-**interpretation step**, performed by the agent layer: a `claude-code-action`
-step runs Claude over the newly-produced artifacts plus the existing
-prose/claims and writes the **impact declaration** (what is strengthened /
-weakened / overturned) into the data-PR. The engine's only job is to get the new
-data into a PR _deterministically_; deciding what it _means_ is the agent's job.
+**interpretation step**, performed by the agent layer: a **gh-aw workflow**,
+triggered by the engine's data-PR, runs Claude read-only over the
+newly-produced artifacts plus the existing prose/claims and writes the
+**impact declaration** (what is strengthened / weakened / overturned) onto the
+data-PR branch via the `push-to-pull-request-branch` safe-output. The engine's
+only job is to get the new data into a PR _deterministically_; deciding what it
+_means_ is the agent's job. (One consequence: the engine must open data-PRs
+under a GitHub App identity — default-token PRs don't trigger downstream
+workflows.)
 
 > **Status (Phase 1).** The deterministic engine is **built and validated
-> end-to-end** against real GitHub. The agentic interpretation is **not wired
-> yet**: today a data-PR carries a _templated_ impact stub, and the
-> `claude-code-action` step that performs the real inference is upcoming work
-> (it pairs with the bot identity / CI, plan steps 7–8). **There is no
-> `claude-code-action` invocation anywhere in the repo today**; the only
-> inference run so far was a manual probe. So no LLM inference currently runs in
-> CI.
+> end-to-end** — locally and in CI (a dispatched run opened a real data-PR).
+> The agentic interpretation is **not wired yet**: today a data-PR carries a
+> _templated_ impact stub, and the gh-aw workflow that performs the real
+> inference is upcoming work (plan steps 7–8, gated on the App identity). The
+> only inference run so far was a manual probe. So no LLM inference currently
+> runs in CI.
 
 ## Instance layout
 
