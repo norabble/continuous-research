@@ -32,6 +32,7 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/node": "^26.0.1",
+    "@vitest/coverage-v8": "^4.1.9",
     "eslint": "^10.6.0",
     "eslint-config-prettier": "^10.1.8",
     "prettier": "^3.8.5",
@@ -42,7 +43,6 @@
     "vitest": "^4.1.9"
   },
   "dependencies": {
-    "@vitest/coverage-v8": "^4.1.9",
     "octokit": "^5.0.5"
   }
 }
