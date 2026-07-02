@@ -176,22 +176,29 @@ of Phase 1.
   `skip/merged` for `btcusd-2026-07-01`, re-proving the merged-state dedup
   path via the maintainer's real acceptance of sample PR #12 (the first
   merged edition).
-- **F4 — Comment-resolution** (last unbuilt Phase-1 behavior): a second gh-aw
-  workflow template — trigger on PR comments, gated by author-association
-  (OWNER/MEMBER/COLLABORATOR), same read-only + `push-to-pull-request-branch`
-  contract — qualified once live on the sample. Small now that the
-  interpretation pattern exists; alternatively descope explicitly to
-  post-Phase-1 with a recorded decision.
-- **F5 — Hardening sweep (step 9 close-out).** `timeout-minutes` on sense.yml;
-  pin/record the gh-aw compiler version expectation; fork-PR secret hygiene
-  note in the templates; cron sanity defaults. Mostly small diffs.
-- **F6 — Docs + engine nits.** README status (the agent layer is now BUILT and
-  running in the sample — the "planned" rows are stale); this plan's step
-  statuses; CLI help still advertises `propose: not yet` (drop it — propose is
-  internal to `sense`); known engine nits recorded: `putFile` cannot update an
-  existing file (no `sha` — decline re-record would 422), sensor contract is
-  single-detection per run (multi-detection deferred, see
-  token-source-review plan).
+- **F4 — Comment-resolution — ✅ DONE (2026-07-03).** Built on gh-aw's
+  `slash_command` trigger (`/resolve <request>`; conditional gating compiled
+  into YAML so ordinary comments spend no agent quota; role-gated per CONCEPT).
+  Same write contract as interpretation + one `add-comment` reply. **Qualified
+  live** on the sample (test PR #13: requested file committed to the branch,
+  summary reply posted). Gotcha captured: the agent cannot "read the
+  triggering comment" on its own — interpolate
+  `steps.sanitized.outputs.text`. Template ships in `init`.
+- **F5 — Hardening sweep — ✅ DONE.** Timeouts on all jobs (engine + agent);
+  concurrency on sense; cron matched to data rhythm; agent writes confined by
+  `allowed-files`; lock files pin action SHAs; per-provider escalation caps
+  where applicable. Residual (accepted): gh-aw compiler version is recorded in
+  each lock header rather than centrally pinned; instances recompile
+  deliberately.
+- **F6 — Docs + engine nits — ✅ DONE.** README truth-up; `putFile` now
+  fetches the existing blob sha (updates no longer 422); CLI help cleaned;
+  CLAUDE.md trailer names the working model. Deferred (recorded):
+  multi-detection sensor contract (see token-source-review plan).
+
+**Phase 1 is complete** against the definition of done: `init` emits the
+proven instance (engine workflows + both agent templates, verified to
+compile), the loop and comment-resolution are qualified live in the sample,
+and the sample runs on the shipped `npx github:` distribution.
 
 **Definition of done for Phase 1:** a new instance created with
 `continuous-research init` + the documented manual setup reaches a running

@@ -176,6 +176,72 @@ Keep the tone factual and appropriately hedged. Commit both files to the PR
 branch with the message \`interpretation(<descriptor>): impact declaration\`.
 `;
 
+const COMMENT_RESOLUTION_WORKFLOW = `---
+description: "Comment resolution: address a reviewer's /resolve request on a data-PR"
+on:
+  slash_command:
+    name: resolve
+engine:
+  id: gemini
+  model: gemini-3.1-flash-lite
+timeout-minutes: 15
+permissions:
+  contents: read
+  pull-requests: read
+safe-outputs:
+  push-to-pull-request-branch:
+    # Same contract as interpretation: the agent may touch ONLY the impact
+    # declarations and the living findings doc.
+    protected-files: allowed
+    allowed-files:
+      - ".research/impact/*.md"
+      - "findings.md"
+  add-comment:
+    max: 1
+---
+
+# Comment resolution
+
+You are the **comment-resolution step** of a Continuous Research instance. A
+reviewer commented \`/resolve <request>\` on a pull request. Address their
+request with changes on the PR branch, or explain why you can't.
+
+## Guard
+
+Check the pull request's labels. If this is not a pull request, or it has no
+label starting with \`data:\`, reply (add-comment) that \`/resolve\` only
+applies to data-PRs, and stop. Otherwise the part after \`data:\` is the
+**descriptor**.
+
+## The request
+
+The reviewer's comment (sanitized) is:
+
+> \${{ steps.sanitized.outputs.text }}
+
+The request is everything after \`/resolve\`. The reviewer is asking for a
+change to the edition's **interpretation** — e.g. rephrase or re-hedge a
+claim, correct an arithmetic slip, expand the impact declaration's
+justification, or reconcile the findings text with the edition artifact.
+TODO: describe where this project's edition artifacts live.
+
+## Act
+
+- If the request concerns \`.research/impact/<descriptor>.md\` or
+  \`findings.md\`: make the requested change on the PR branch, keeping the
+  claim annotation format intact, commit with the message
+  \`resolve(<descriptor>): <short summary>\`, and push via
+  push_to_pull_request_branch.
+- If the request is outside those two files, or asks for something factually
+  unsupported by the edition artifact, do NOT force a change — reply
+  explaining what you can and cannot do, and why.
+
+## Reply
+
+Always finish with one add-comment reply summarizing what you changed (or why
+you made no change). Keep the tone factual and appropriately hedged.
+`;
+
 export const NEXT_STEPS = `
 Next steps:
   1. Sensor: point .research/config.json "sensor" at a command that prints a
@@ -184,9 +250,9 @@ Next steps:
      Pull requests — read & write), install it on this repo, and set the
      APP_ID and APP_PRIVATE_KEY secrets. Data-PRs must be App-authored, or the
      interpretation workflow never triggers.
-  3. Interpretation: fill in the TODOs in
-     .github/workflows/interpretation.md, set your inference secret (e.g.
-     GEMINI_API_KEY), then compile it:
+  3. Agent workflows: fill in the TODOs in
+     .github/workflows/interpretation.md and comment-resolution.md, set your
+     inference secret (e.g. GEMINI_API_KEY), then compile them:
        gh extension install github/gh-aw && gh aw compile
   4. Commit .research/ and .github/workflows/ (including the compiled
      interpretation.lock.yml), then dispatch the "sense" workflow.
@@ -198,5 +264,6 @@ export function scaffoldFiles(): ScaffoldFile[] {
     { path: ".github/workflows/sense.yml", content: SENSE_WORKFLOW },
     { path: ".github/workflows/decline.yml", content: DECLINE_WORKFLOW },
     { path: ".github/workflows/interpretation.md", content: INTERPRETATION_WORKFLOW },
+    { path: ".github/workflows/comment-resolution.md", content: COMMENT_RESOLUTION_WORKFLOW },
   ];
 }

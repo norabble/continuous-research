@@ -6,13 +6,26 @@ describe("scaffoldFiles", () => {
   const files = scaffoldFiles();
   const byPath = (p: string) => files.find((f) => f.path === p)?.content ?? "";
 
-  it("emits the config, both engine workflows, and the interpretation template", () => {
+  it("emits the config, both engine workflows, and both agent templates", () => {
     expect(files.map((f) => f.path)).toEqual([
       ".research/config.json",
       ".github/workflows/sense.yml",
       ".github/workflows/decline.yml",
       ".github/workflows/interpretation.md",
+      ".github/workflows/comment-resolution.md",
     ]);
+  });
+
+  it("comment-resolution.md uses the slash-command trigger and sanitized text", () => {
+    const res = byPath(".github/workflows/comment-resolution.md");
+    expect(res).toContain("slash_command:");
+    expect(res).toContain("name: resolve");
+    // Sanitized comment interpolation must survive as a literal expression,
+    // with no stray escaping around backticks.
+    expect(res).toContain("${{ steps.sanitized.outputs.text }}");
+    expect(res).not.toContain("\\`");
+    expect(res).toContain("protected-files: allowed");
+    expect(res).toContain("add-comment:");
   });
 
   it("emits a parseable config with a sensor", () => {
