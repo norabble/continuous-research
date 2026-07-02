@@ -42,6 +42,7 @@
     "vitest": "^4.1.9"
   },
   "dependencies": {
+    "@vitest/coverage-v8": "^4.1.9",
     "octokit": "^5.0.5"
   }
 }
