@@ -68,7 +68,7 @@ async function main(): Promise<number> {
   const command = process.argv[2];
   if (!command || command === "--help" || command === "-h") {
     console.log("continuous-research <command>");
-    console.log(`commands: ${Object.keys(COMMANDS).join(", ")} (propose: not yet)`);
+    console.log(`commands: ${Object.keys(COMMANDS).join(", ")}`);
     return 0;
   }
   const handler = COMMANDS[command];
