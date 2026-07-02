@@ -137,6 +137,20 @@ export class OctokitGitHubPort implements GitHubPort {
   }
 
   async putFile(input: PutFileInput): Promise<void> {
+    // Updating an existing file requires its blob sha; without it the API
+    // 422s (e.g. re-recording a decline for the same descriptor).
+    let sha: string | undefined;
+    try {
+      const { data } = await this.octokit.rest.repos.getContent({
+        owner: this.owner,
+        repo: this.repo,
+        path: input.path,
+        ref: input.branch,
+      });
+      if (!Array.isArray(data) && data.type === "file") sha = data.sha;
+    } catch (error) {
+      if (!isNotFoundError(error)) throw error;
+    }
     await this.octokit.rest.repos.createOrUpdateFileContents({
       owner: this.owner,
       repo: this.repo,
@@ -144,6 +158,7 @@ export class OctokitGitHubPort implements GitHubPort {
       message: input.message,
       content: Buffer.from(input.content, "utf8").toString("base64"),
       branch: input.branch,
+      ...(sha === undefined ? {} : { sha }),
     });
   }
 
