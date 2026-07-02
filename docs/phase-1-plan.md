@@ -143,6 +143,66 @@ contradiction fix is proven. That is the skeleton's #1 job.
 9. **Guardrail hardening** — gating, max-turns, timeouts, concurrency, fork-PR
    hygiene; pin the gh-aw version.
 
+## Finishing Phase 1 — status and remaining work (2026-07-02)
+
+**Where the steps actually stand.** Steps 1–6 built. Steps 7–8 are **done
+empirically in the sample** (2026-07-02): the App identity works (App-authored
+data-PRs trigger the gh-aw interpretation workflow), and the full loop ran
+end-to-end in CI — real BTC edition → data-PR → `gemini-3.1-flash-lite`
+interpretation → impact declaration + findings revision pushed via safe-output
+(sample PR #12). Working config and quirks are recorded in the sample's git
+history (model quota math ~16–25 requests/session; `allowed-files` +
+`protected-files: allowed`; no gh-aw model fallback).
+
+**The honest gap:** the proven configuration lives only *hand-built in the
+sample*. `init` still scaffolds the pre-gh-aw guess — default `GITHUB_TOKEN`
+(interpretation would never trigger), `npx github:` against a private repo
+(broken), no interpretation workflow, no schedule. Experimentation was
+deliberately allowed to outrun the CLI; paying that back **is** the remainder
+of Phase 1.
+
+### Remaining work (sequenced)
+
+- **F1 — Distribution decision (gates F2/F3).** Make
+  `npx github:norabble/continuous-research` real by flipping the framework repo
+  public (maintainer's explicit call), or publish `0.0.x` to npm, or both.
+  Everything else can proceed against whichever is chosen.
+- **F2 — Truth-up `init` to the proven instance.** Scaffold what the sample
+  actually runs: sense.yml with App-token mint (`create-github-app-token`) +
+  schedule + `timeout-minutes` + concurrency; decline.yml unchanged; an
+  **interpretation gh-aw template** (`.github/workflows/interpretation.md`
+  with engine/model, `allowed-files` + `protected-files: allowed`, the
+  guard/read/write instructions, fenced annotation example) plus a next-steps
+  script covering the real setup: create/install the App, secrets (`APP_ID`,
+  `APP_PRIVATE_KEY`, `GEMINI_API_KEY`), org/repo Actions-PR setting,
+  `gh aw compile`, first dispatch. Template tests updated accordingly.
+- **F3 — Dogfood the installation.** Switch the sample's workflows from the
+  vendored `engine/continuous-research.mjs` to the real distribution and
+  delete the vendor dir. The sample consuming the shipped mechanism *is* the
+  installation test.
+- **F4 — Comment-resolution** (last unbuilt Phase-1 behavior): a second gh-aw
+  workflow template — trigger on PR comments, gated by author-association
+  (OWNER/MEMBER/COLLABORATOR), same read-only + `push-to-pull-request-branch`
+  contract — qualified once live on the sample. Small now that the
+  interpretation pattern exists; alternatively descope explicitly to
+  post-Phase-1 with a recorded decision.
+- **F5 — Hardening sweep (step 9 close-out).** `timeout-minutes` on sense.yml;
+  pin/record the gh-aw compiler version expectation; fork-PR secret hygiene
+  note in the templates; cron sanity defaults. Mostly small diffs.
+- **F6 — Docs + engine nits.** README status (the agent layer is now BUILT and
+  running in the sample — the "planned" rows are stale); this plan's step
+  statuses; CLI help still advertises `propose: not yet` (drop it — propose is
+  internal to `sense`); known engine nits recorded: `putFile` cannot update an
+  existing file (no `sha` — decline re-record would 422), sensor contract is
+  single-detection per run (multi-detection deferred, see
+  token-source-review plan).
+
+**Definition of done for Phase 1:** a new instance created with
+`continuous-research init` + the documented manual setup reaches a running
+loop (sense → data-PR → interpretation → human merge) **without hand-editing
+workflows**, and the sample itself runs on the shipped distribution rather
+than a vendored bundle.
+
 ## Step 5 — detailed design
 
 The skeleton runs in a **dedicated sample repo** (the genuine reference
