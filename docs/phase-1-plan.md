@@ -163,23 +163,19 @@ of Phase 1.
 
 ### Remaining work (sequenced)
 
-- **F1 — Distribution decision (gates F2/F3).** Make
-  `npx github:norabble/continuous-research` real by flipping the framework repo
-  public (maintainer's explicit call), or publish `0.0.x` to npm, or both.
-  Everything else can proceed against whichever is chosen.
-- **F2 — Truth-up `init` to the proven instance.** Scaffold what the sample
-  actually runs: sense.yml with App-token mint (`create-github-app-token`) +
-  schedule + `timeout-minutes` + concurrency; decline.yml unchanged; an
-  **interpretation gh-aw template** (`.github/workflows/interpretation.md`
-  with engine/model, `allowed-files` + `protected-files: allowed`, the
-  guard/read/write instructions, fenced annotation example) plus a next-steps
-  script covering the real setup: create/install the App, secrets (`APP_ID`,
-  `APP_PRIVATE_KEY`, `GEMINI_API_KEY`), org/repo Actions-PR setting,
-  `gh aw compile`, first dispatch. Template tests updated accordingly.
-- **F3 — Dogfood the installation.** Switch the sample's workflows from the
-  vendored `engine/continuous-research.mjs` to the real distribution and
-  delete the vendor dir. The sample consuming the shipped mechanism *is* the
-  installation test.
+- **F1 — Distribution decision — ✅ DONE (2026-07-03).** The maintainer flipped
+  the framework repo **public**; `npx github:norabble/continuous-research`
+  verified (~16 s cold in CI: clone → install → `prepare` build → run).
+- **F2 — Truth-up `init` — ✅ DONE.** `init` scaffolds the proven instance:
+  App-token mint, timeouts/concurrency, the interpretation gh-aw template
+  (verified to `gh aw compile` clean), and real next-steps. Tests guard the
+  contract (incl. the fenced-annotation regression).
+- **F3 — Dogfood the installation — ✅ DONE (2026-07-03).** The sample's
+  workflows run `npx github:norabble/continuous-research`; the vendored
+  `engine/` is deleted. Live CI run confirmed — and doubly so: it reported
+  `skip/merged` for `btcusd-2026-07-01`, re-proving the merged-state dedup
+  path via the maintainer's real acceptance of sample PR #12 (the first
+  merged edition).
 - **F4 — Comment-resolution** (last unbuilt Phase-1 behavior): a second gh-aw
   workflow template — trigger on PR comments, gated by author-association
   (OWNER/MEMBER/COLLABORATOR), same read-only + `push-to-pull-request-branch`
