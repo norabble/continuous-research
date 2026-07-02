@@ -32,12 +32,15 @@ Both run inside **GitHub Actions workflows**, which provide the triggers:
 | -------------------- | ------------------- | --------------------------------------------------------- | ------ | ----------- |
 | `sense`              | schedule / dispatch | sensor → dedup → (if new) pipeline + open the data-PR     | engine | **built**   |
 | `decline`            | PR closed-unmerged  | commit the decline record to `main`                       | engine | **built**   |
-| _interpretation_     | a new data-PR       | read the new data + claims → write the impact declaration | agent  | _planned_   |
+| `interpretation`     | a new data-PR       | read the new data + claims → write the impact declaration | agent  | **built**   |
 | _comment-resolution_ | a reviewer comment  | attempt to address the comment on the PR                  | agent  | _planned_   |
 
-The **agent layer is entirely planned, not yet implemented** — there is **no
-gh-aw workflow anywhere in this repo or the sample yet**. Only the two engine
-workflows exist today; the agent rows are shown for the intended shape.
+The first three run end-to-end in
+[the sample instance](https://github.com/norabble/continuous-research-sample)
+— on 2026-07-02 a scheduled cycle sensed a real edition, opened the data-PR
+under the App identity, and the gh-aw interpretation agent wrote the impact
+declaration onto the PR branch via safe-outputs. Comment-resolution is the one
+remaining planned behavior.
 
 ### How is inference on the produced data invoked?
 
@@ -52,13 +55,12 @@ _means_ is the agent's job. (One consequence: the engine must open data-PRs
 under a GitHub App identity — default-token PRs don't trigger downstream
 workflows.)
 
-> **Status (Phase 1).** The deterministic engine is **built and validated
-> end-to-end** — locally and in CI (a dispatched run opened a real data-PR).
-> The agentic interpretation is **not wired yet**: today a data-PR carries a
-> _templated_ impact stub, and the gh-aw workflow that performs the real
-> inference is upcoming work (plan steps 7–8, gated on the App identity). The
-> only inference run so far was a manual probe. So no LLM inference currently
-> runs in CI.
+> **Status (Phase 1, closing).** The full loop — sense → dedup → App-authored
+> data-PR → gh-aw interpretation → impact declaration on the PR — **runs in CI
+> in the sample instance** (first complete cycle 2026-07-02, on free-tier
+> inference, fail-closed). Remaining to finish Phase 1: distribution (how
+> instances install the engine), comment-resolution, and hardening — see the
+> [plan](./docs/phase-1-plan.md) § "Finishing Phase 1".
 
 ## Instance layout
 
@@ -68,7 +70,7 @@ An instance declares its project hooks — **sensor**, **pipeline**,
 **provenance stubs** (`.research/provenance/`), and **decline records**
 (`.research/decisions/`) live in the instance repo. See
 [`norabble/continuous-research-sample`](https://github.com/norabble/continuous-research-sample)
-for a worked (skeleton-stage) instance.
+for the worked reference instance (daily BTC-USD editions, live loop).
 
 ## Status
 
