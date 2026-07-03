@@ -41,7 +41,7 @@ describe("scaffoldFiles", () => {
     expect(sense).toContain("concurrency:");
     expect(sense).toContain("timeout-minutes:");
     // The engine ref is pinned — instances upgrade deliberately, not on HEAD.
-    expect(sense).toContain("npx --yes github:norabble/continuous-research#v0.1.1 sense");
+    expect(sense).toContain("npx --yes github:norabble/continuous-research#v0.1.2 sense");
     // The workflow's own token stays read-only; the App does the writes.
     expect(sense).toContain("contents: read");
   });
