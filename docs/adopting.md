@@ -82,7 +82,10 @@ your App → Configure → add the repository (or
 then set the same two secrets in the new repo.
 
 Finally, note your App's **slug** (the lowercase name in the App's URL) —
-the interpretation workflow needs it (next section).
+the interpretation workflow needs it (next section). If you're reusing an
+App you don't administer, the slug is also readable from any existing
+instance: the `bots:` line of its `interpretation.md`, or the
+`<slug>[bot]` author on its data-PRs.
 
 ## Repo / org settings
 
@@ -98,7 +101,11 @@ workflows: the agent runs read-only; writes land only through sanitized
 
 1. **Fill the `TODO`s**: in `interpretation.md`, your App's slug under
    `bots:` and where your artifacts live under *Read*; in
-   `comment-resolution.md`, the same artifact location.
+   `comment-resolution.md`, the same artifact location. (When your instance
+   grows workflows beyond the scaffolded two, the frontmatter reference is
+   gh-aw's own documentation, linked from the
+   [gh-aw repo](https://github.com/github/gh-aw) — the scaffold's patterns
+   cover most of it, but they are examples, not the spec.)
 2. **Choose engine/model.** The scaffold defaults to
    `gemini-3.1-flash-lite`, the configuration proven in the sample. The
    empirics that matter (measured 2026-07-02): one gh-aw session costs
@@ -120,8 +127,17 @@ workflows: the agent runs read-only; writes land only through sanitized
    git push
    ```
 
-   Commit the generated `.lock.yml` files — they *are* the runnable
-   workflows, and they pin action SHAs.
+   `compile` generates more than the `.lock.yml` files: also
+   `.gitattributes`, `.github/aw/actions-lock.json` (the action SHA pins),
+   and a maintenance workflow. Commit the whole generated set — the
+   `.lock.yml` files *are* the runnable workflows.
+
+   The **first compile prints a security warning** ("SECURITY REVIEW
+   REQUIRED … New restricted secret(s): GEMINI_API_KEY") and still exits 0.
+   That is expected, not a failure: gh-aw's safe-update mode is asking you
+   to confirm that the new secret really should reach the inference engine
+   (it is validated, passed only to the engine, and excluded from the
+   firewall container's env). Review, then proceed.
 
 ## First run — verify the loop
 
@@ -152,7 +168,11 @@ The scaffold ships these; keep them when you customize:
 - `timeout-minutes` on every job; `concurrency` on sense (serialization is
   the duplicate-proposal guard under racing crons).
 - `allowed-files` + `protected-files: allowed` on agent safe-outputs — the
-  agent can only ever touch the impact files and the findings doc.
+  agent can only ever touch the impact files and the findings doc. Note
+  `protected-files: allowed` is needed on **any** safe-output that writes
+  under a top-level dot-folder — `create-pull-request` as much as
+  `push-to-pull-request-branch`. A workflow PRing `.research/…` changes
+  (e.g. a source registry) silently compiles to `request_review` without it.
 - Cron matched to the data's real rhythm; agent triggers gated to trusted
   author associations (anonymous comments must not spend quota).
 - Fail-closed inference: quota exhaustion stops agent runs; the
