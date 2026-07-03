@@ -66,7 +66,7 @@ jobs:
         # If the framework is not reachable via npx in your setup, vendor the
         # engine bundle into the repo and use:
         #   run: node engine/continuous-research.mjs sense
-        run: npx --yes github:norabble/continuous-research#v0.1.0 sense
+        run: npx --yes github:norabble/continuous-research#v0.1.1 sense
 `;
 
 const DECLINE_WORKFLOW = `name: decline
@@ -96,7 +96,7 @@ jobs:
       - name: record-decline
         env:
           GITHUB_TOKEN: \${{ secrets.GITHUB_TOKEN }}
-        run: npx --yes github:norabble/continuous-research#v0.1.0 record-decline
+        run: npx --yes github:norabble/continuous-research#v0.1.1 record-decline
 `;
 
 const INTERPRETATION_WORKFLOW = `---
