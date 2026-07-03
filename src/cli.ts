@@ -8,8 +8,10 @@
  */
 
 import { access, mkdir, readFile, writeFile } from "node:fs/promises";
+import { createRequire } from "node:module";
 import { dirname } from "node:path";
 import { parseConfig } from "./config";
+import { helpText } from "./help";
 import { runSense, runRecordDecline, runInit } from "./commands";
 import { NEXT_STEPS } from "./scaffold";
 import { execSensor, readArtifact, createGitHubPortFromEnv } from "./io";
@@ -64,16 +66,26 @@ const COMMANDS: Record<string, () => Promise<number>> = {
   "record-decline": cmdRecordDecline,
 };
 
+/** Works from both src/ (tsx dev) and dist/ (built): ../package.json is the repo root. */
+function packageVersion(): string {
+  const pkg = createRequire(import.meta.url)("../package.json") as { version: string };
+  return pkg.version;
+}
+
 async function main(): Promise<number> {
   const command = process.argv[2];
+  if (command === "--version" || command === "-v") {
+    console.log(packageVersion());
+    return 0;
+  }
   if (!command || command === "--help" || command === "-h") {
-    console.log("continuous-research <command>");
-    console.log(`commands: ${Object.keys(COMMANDS).join(", ")}`);
+    console.log(helpText(packageVersion()));
     return 0;
   }
   const handler = COMMANDS[command];
   if (!handler) {
     console.error(`Unknown command: ${command}`);
+    console.error(`commands: ${Object.keys(COMMANDS).join(", ")} (see --help)`);
     return 1;
   }
   return handler();
