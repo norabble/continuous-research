@@ -33,14 +33,14 @@ Both run inside **GitHub Actions workflows**, which provide the triggers:
 | `sense`              | schedule / dispatch | sensor → dedup → (if new) pipeline + open the data-PR     | engine | **built**   |
 | `decline`            | PR closed-unmerged  | commit the decline record to `main`                       | engine | **built**   |
 | `interpretation`     | a new data-PR       | read the new data + claims → write the impact declaration | agent  | **built**   |
-| _comment-resolution_ | a reviewer comment  | attempt to address the comment on the PR                  | agent  | _planned_   |
+| `comment-resolution` | `/resolve <request>` | address the reviewer's request on the data-PR branch     | agent  | **built**   |
 
-The first three run end-to-end in
+All four run in
 [the sample instance](https://github.com/norabble/continuous-research-sample)
 — on 2026-07-02 a scheduled cycle sensed a real edition, opened the data-PR
 under the App identity, and the gh-aw interpretation agent wrote the impact
-declaration onto the PR branch via safe-outputs. Comment-resolution is the one
-remaining planned behavior.
+declaration onto the PR branch via safe-outputs; comment-resolution was
+qualified live on 2026-07-03 (`/resolve` gated to trusted reviewers).
 
 ### How is inference on the produced data invoked?
 
@@ -55,12 +55,12 @@ _means_ is the agent's job. (One consequence: the engine must open data-PRs
 under a GitHub App identity — default-token PRs don't trigger downstream
 workflows.)
 
-> **Status (Phase 1, closing).** The full loop — sense → dedup → App-authored
-> data-PR → gh-aw interpretation → impact declaration on the PR — **runs in CI
-> in the sample instance** (first complete cycle 2026-07-02, on free-tier
-> inference, fail-closed). Remaining to finish Phase 1: distribution (how
-> instances install the engine), comment-resolution, and hardening — see the
-> [plan](./docs/phase-1-plan.md) § "Finishing Phase 1".
+> **Status (Phase 1 complete, 2026-07-03).** The full loop — sense → dedup →
+> App-authored data-PR → gh-aw interpretation → impact declaration on the PR —
+> **runs in CI in the sample instance** on the shipped `npx github:`
+> distribution (first complete cycle 2026-07-02, on free-tier inference,
+> fail-closed). See the [plan](./docs/phase-1-plan.md) § "Finishing Phase 1"
+> for the record.
 
 ## Instance layout
 
@@ -79,9 +79,21 @@ for the worked reference instance (daily BTC-USD editions, live loop).
 > `.research/config.json` and the sensor script with the same care as workflow
 > changes.
 
+## Adopting it
+
+Two documents get a project from zero to a live loop:
+
+- **[Adoption guide](./docs/adopting.md)** — install in a new or existing
+  project: the three hooks, GitHub App setup, repo settings, the agent layer,
+  and a first-run verification walkthrough.
+- **[CLI + engine reference](./docs/cli.md)** — commands, environment, the
+  config schema, the sensor contract, and exactly what the engine writes.
+
 ## Status
 
-Early — Phase 1, building in the open. The deterministic loop (sense → dedup →
-propose → decline) works and is validated; the agentic interpretation,
-comment-resolution, and unattended CI are in progress. See the
-[plan](./docs/phase-1-plan.md) for the step-by-step state.
+Phase 1 complete (2026-07-03): `init` scaffolds the proven instance
+configuration, and the full loop — including agentic interpretation and
+comment-resolution — is qualified live in the sample on the shipped
+distribution. Phase 2 (the mechanical impact layer, consistency-linter,
+judgment review, `resolves_when`, the storage-policy advisor) has not
+started. See the [plan](./docs/phase-1-plan.md) for the record.
