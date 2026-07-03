@@ -64,8 +64,25 @@ only when genuinely new — opens the data-PR.
    commit the stub + artifacts, open the PR, apply the label
    `data:<descriptor>`. Outcome `proposed` with the PR number.
 
-One line of JSON is logged, e.g.
-`[sense] {"action":"skip","state":"merged","descriptor":"btcusd-2026-07-01"}`.
+One line of JSON is logged — the outcome is exactly one of:
+
+```
+[sense] {"action":"none","reason":"sensor reported no change"}
+[sense] {"action":"skip","state":"pending","descriptor":"btcusd-2026-07-01"}
+[sense] {"action":"proposed","descriptor":"btcusd-2026-07-01","prNumber":12,"branch":"data/btcusd-2026-07-01"}
+```
+
+(`state` is `merged` / `pending` / `declined` — see *Dedup semantics*.)
+
+**Working directory:** the engine resolves `.research/config.json`, executes
+the sensor, and reads `artifacts` paths all against its own working directory
+— the directory the CLI is invoked from (in Actions, the checkout root). Run
+it from the repository root; artifact paths are repo-root-relative.
+
+**Running locally:** artifacts are read from the *local* working tree, but
+the `data/<descriptor>` branch is created from the **remote** default
+branch's head. Push your latest commits before running `sense` locally, or
+the data-PR's base may not contain the sensor that produced it.
 
 ### `record-decline`
 
@@ -129,7 +146,7 @@ or a new edition exists:
 | `source` | where the edition was obtained (URL / locator) |
 | `retrievedAt` | ISO-8601 timestamp |
 | `hash` | content hash formatted `algo:hexdigest`, e.g. `sha256:…` |
-| `artifacts` | optional; paths the sensor has **already written into the working tree**. The engine reads them and commits them on the data-PR branch. Omitted ⇒ only the provenance stub is committed. |
+| `artifacts` | optional; paths the sensor has **already written into the working tree**. The engine reads them and commits them on the data-PR branch. Any repo-root-relative file path is allowed — including files under `.research/` (e.g. a sensor-maintained source registry riding the data-PR). Omitted ⇒ only the provenance stub is committed. |
 
 Contract notes:
 
@@ -143,7 +160,7 @@ Contract notes:
 
 | Surface | Value |
 | --- | --- |
-| Branch | `data/<descriptor>` (from the default branch's head) |
+| Branch | `data/<descriptor>` (from the **remote** default branch's head) |
 | PR title | `data: <descriptor>` |
 | PR body | templated impact-declaration stub (source / retrieved / hash); the agent layer replaces this with prose interpretation on the PR branch |
 | Label | `data:<descriptor>` — the dedup key; do not remove it |

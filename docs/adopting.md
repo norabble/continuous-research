@@ -126,7 +126,8 @@ workflows: the agent runs read-only; writes land only through sanitized
 ## First run — verify the loop
 
 1. Actions → **sense** → *Run workflow*. A healthy first run logs
-   `[sense] {"action":"proposed",...}` and opens a PR titled
+   `[sense] {"action":"proposed",...}` (full outcome shapes:
+   [cli.md → `sense`](./cli.md#sense)) and opens a PR titled
    `data: <descriptor>` with the `data:<descriptor>` label, containing the
    provenance stub + artifacts.
 2. Within a minute or two the **interpretation** workflow should fire on that
