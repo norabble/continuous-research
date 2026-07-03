@@ -63,7 +63,7 @@ export interface RecordDeclineDeps {
 }
 
 export async function runRecordDecline(deps: RecordDeclineDeps): Promise<void> {
-  const latest = await deps.port.latestComment(deps.prNumber);
+  const latest = await deps.port.latestTrustedComment(deps.prNumber);
   const reason = latest ?? deps.defaultReason ?? "Closed without merge; no reason provided.";
   await recordDecline(deps.port, {
     descriptor: deps.descriptor,

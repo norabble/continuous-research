@@ -52,6 +52,27 @@ export function isNotFoundError(error: unknown): boolean {
   return typeof error === "object" && error !== null && "status" in error && error.status === 404;
 }
 
+/** Author associations whose comments may become decline records on main. */
+const TRUSTED_ASSOCIATIONS = new Set(["OWNER", "MEMBER", "COLLABORATOR"]);
+
+export interface RawComment {
+  body?: string | null;
+  author_association?: string | null;
+}
+
+/**
+ * The most recent non-empty comment body from a trusted author, or null.
+ * On public instances anyone can comment on a PR; only trusted authors'
+ * text may be committed to `main` as a decline reason (security review M1).
+ */
+export function latestTrustedCommentBody(comments: readonly RawComment[]): string | null {
+  for (let i = comments.length - 1; i >= 0; i--) {
+    const c = comments[i];
+    if (c?.body && TRUSTED_ASSOCIATIONS.has(c.author_association ?? "")) return c.body;
+  }
+  return null;
+}
+
 export interface OctokitGitHubPortOptions {
   octokit: Octokit;
   owner: string;
@@ -103,14 +124,14 @@ export class OctokitGitHubPort implements GitHubPort {
     }
   }
 
-  async latestComment(prNumber: number): Promise<string | null> {
+  async latestTrustedComment(prNumber: number): Promise<string | null> {
     const comments = await this.octokit.paginate(this.octokit.rest.issues.listComments, {
       owner: this.owner,
       repo: this.repo,
       issue_number: prNumber,
       per_page: 100,
     });
-    return comments.at(-1)?.body ?? null;
+    return latestTrustedCommentBody(comments);
   }
 
   async defaultBranch(): Promise<string> {

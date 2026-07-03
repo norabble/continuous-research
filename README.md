@@ -72,6 +72,13 @@ An instance declares its project hooks — **sensor**, **pipeline**,
 [`norabble/continuous-research-sample`](https://github.com/norabble/continuous-research-sample)
 for the worked reference instance (daily BTC-USD editions, live loop).
 
+> **Trust boundary.** The `sensor` (and `pipeline`) declared in
+> `.research/config.json` are shell commands the engine executes in CI. They
+> sit at the same trust boundary as the workflow files themselves: anyone with
+> write access to the instance repo controls both. Review changes to
+> `.research/config.json` and the sensor script with the same care as workflow
+> changes.
+
 ## Status
 
 Early — Phase 1, building in the open. The deterministic loop (sense → dedup →

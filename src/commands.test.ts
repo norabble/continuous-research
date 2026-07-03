@@ -7,7 +7,7 @@ function portWith(overrides: Partial<GitHubPort>): GitHubPort {
   return {
     listPullRequestsByLabel: () => Promise.resolve([]),
     provenanceStubExists: () => Promise.resolve(false),
-    latestComment: () => Promise.resolve(null),
+    latestTrustedComment: () => Promise.resolve(null),
     defaultBranch: () => Promise.resolve("main"),
     branchHeadSha: () => Promise.resolve("sha"),
     createBranch: () => Promise.resolve(),
@@ -76,7 +76,7 @@ describe("runRecordDecline", () => {
   it("uses the latest comment as the reason", async () => {
     let committed = "";
     const port = portWith({
-      latestComment: () => Promise.resolve("looks anomalous, wait for revision"),
+      latestTrustedComment: () => Promise.resolve("looks anomalous, wait for revision"),
       putFile: (i) => {
         committed = i.content;
         return Promise.resolve();
@@ -94,7 +94,7 @@ describe("runRecordDecline", () => {
   it("falls back to a default when there are no comments", async () => {
     let committed = "";
     const port = portWith({
-      latestComment: () => Promise.resolve(null),
+      latestTrustedComment: () => Promise.resolve(null),
       putFile: (i) => {
         committed = i.content;
         return Promise.resolve();
