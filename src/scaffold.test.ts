@@ -40,7 +40,8 @@ describe("scaffoldFiles", () => {
     expect(sense).toContain("GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}");
     expect(sense).toContain("concurrency:");
     expect(sense).toContain("timeout-minutes:");
-    expect(sense).toContain("npx --yes github:norabble/continuous-research sense");
+    // The engine ref is pinned — instances upgrade deliberately, not on HEAD.
+    expect(sense).toContain("npx --yes github:norabble/continuous-research#v0.1.0 sense");
     // The workflow's own token stays read-only; the App does the writes.
     expect(sense).toContain("contents: read");
   });
