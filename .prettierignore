@@ -2,5 +2,7 @@ node_modules/
 dist/
 coverage/
 package-lock.json
+# Claude Code machine-specific files (device nodes in WSL)
+.claude/
 # Design docs are hand-wrapped (~80 col); don't let Prettier reflow them.
 *.md
