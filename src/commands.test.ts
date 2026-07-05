@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { runSense, runRecordDecline, runInit } from "./commands";
+import { runSense, runRecordDecline, runInit, runImpact } from "./commands";
 import type { GitHubPort } from "./ports";
 
 /** A full GitHubPort with succeeding inert defaults; override per test. */
@@ -135,5 +135,60 @@ describe("runInit", () => {
       ".github/workflows/interpretation.md",
       ".github/workflows/comment-resolution.md",
     ]);
+  });
+});
+
+describe("runImpact", () => {
+  const config = {
+    sensor: "x",
+    impact: { enabled: true, resultsPath: "data/${descriptor}.json", findings: "findings.md" },
+  };
+  const findings = "<!-- claim: trend | backs: close | status: supported -->\n";
+
+  it("throws when the impact layer is disabled", async () => {
+    await expect(
+      runImpact({
+        config: { sensor: "x" },
+        port: portWith({}),
+        readWorkingFile: () => Promise.resolve("{}"),
+        descriptor: "btcusd-2026-07-01",
+      }),
+    ).rejects.toThrow(/impact layer/);
+  });
+
+  it("first edition (no --against) → baseline null, no changed keys", async () => {
+    const out = await runImpact({
+      config,
+      port: portWith({}),
+      readWorkingFile: (p) =>
+        Promise.resolve(p === "findings.md" ? findings : JSON.stringify({ close: 100 })),
+      descriptor: "btcusd-2026-07-01",
+    });
+    expect(out.baseline).toBeNull();
+    expect(out.changed).toEqual([]);
+    expect(out.affected).toEqual([]);
+  });
+
+  it("diffs against the prior edition and flags the affected claim", async () => {
+    const priorResults = JSON.stringify({ close: 90 });
+    const out = await runImpact({
+      config,
+      port: portWith({
+        defaultBranch: () => Promise.resolve("main"),
+        readFileFromRef: (ref, path) => {
+          expect(ref).toBe("main");
+          if (path === "data/btcusd-2026-06-30.json") return Promise.resolve(priorResults);
+          if (path === "findings.md") return Promise.resolve(findings);
+          return Promise.resolve(null);
+        },
+      }),
+      readWorkingFile: (p) =>
+        Promise.resolve(p === "findings.md" ? findings : JSON.stringify({ close: 100 })),
+      descriptor: "btcusd-2026-07-01",
+      against: "btcusd-2026-06-30",
+    });
+    expect(out.baseline).toBe("btcusd-2026-06-30");
+    expect(out.changed).toEqual([{ key: "close", from: 90, to: 100 }]);
+    expect(out.affected).toEqual([{ claimId: "trend", backs: ["close"], status: "supported" }]);
   });
 });

@@ -15,6 +15,11 @@ import { dedupe } from "./dedup";
 import { buildProvenanceStub } from "./provenance";
 import { proposeDataPR, recordDecline } from "./flows";
 import { scaffoldFiles } from "./scaffold";
+import type { ChangedKey } from "./results";
+import { diffResults, resolveResultsPath } from "./results";
+import { parseAnnotations, type ClaimIndex } from "./annotations";
+import { affectedClaims } from "./impact";
+import { lintConsistency, type LintFinding } from "./linter";
 
 export type SenseOutcome =
   | { action: "none"; reason: string }
@@ -90,4 +95,60 @@ export async function runInit(deps: InitDeps): Promise<InitResultEntry[]> {
     results.push({ path: file.path, created: await deps.writeIfAbsent(file.path, file.content) });
   }
   return results;
+}
+
+export interface ImpactArtifact {
+  edition: string;
+  baseline: string | null;
+  changed: ChangedKey[];
+  affected: { claimId: string; backs: string[]; status: string }[];
+  lint: LintFinding[];
+}
+
+export interface ImpactDeps {
+  config: ResearchConfig;
+  port: GitHubPort;
+  /** Reads a file from the PR working tree (the checked-out branch). */
+  readWorkingFile: (path: string) => Promise<string>;
+  descriptor: string;
+  /** The prior merged edition to diff against; absent ⇒ first edition. */
+  against?: string;
+}
+
+export async function runImpact(deps: ImpactDeps): Promise<ImpactArtifact> {
+  const impact = deps.config.impact;
+  if (!impact?.enabled) throw new Error("impact layer is disabled (config.impact.enabled)");
+  if (!impact.resultsPath) throw new Error("config.impact.resultsPath is required");
+  const findingsPath = impact.findings ?? "findings.md";
+
+  const next: unknown = JSON.parse(
+    await deps.readWorkingFile(resolveResultsPath(impact.resultsPath, deps.descriptor)),
+  );
+  const index = parseAnnotations(await deps.readWorkingFile(findingsPath));
+
+  let changed: ChangedKey[] = [];
+  let baseline: string | null = null;
+  let priorIndex: ClaimIndex | undefined;
+  if (deps.against) {
+    const base = await deps.port.defaultBranch();
+    const priorRaw = await deps.port.readFileFromRef(
+      base,
+      resolveResultsPath(impact.resultsPath, deps.against),
+    );
+    const prev: unknown = priorRaw ? JSON.parse(priorRaw) : {};
+    changed = diffResults(prev, next);
+    baseline = deps.against;
+    const priorFindings = await deps.port.readFileFromRef(base, findingsPath);
+    if (priorFindings !== null) priorIndex = parseAnnotations(priorFindings);
+  }
+
+  const affected = affectedClaims(changed, index).map((a) => ({
+    claimId: a.claimId,
+    backs: a.backs,
+    status: a.status,
+  }));
+  const lint =
+    impact.linter === false ? [] : lintConsistency({ results: next, index, changed, priorIndex });
+
+  return { edition: deps.descriptor, baseline, changed, affected, lint };
 }
