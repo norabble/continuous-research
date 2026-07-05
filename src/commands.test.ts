@@ -190,5 +190,12 @@ describe("runImpact", () => {
     expect(out.baseline).toBe("btcusd-2026-06-30");
     expect(out.changed).toEqual([{ key: "close", from: 90, to: 100 }]);
     expect(out.affected).toEqual([{ claimId: "trend", backs: ["close"], status: "supported" }]);
+    expect(out.lint).toEqual([
+      {
+        level: "warn",
+        claimId: "trend",
+        message: 'backing changed but status "supported" was not touched',
+      },
+    ]);
   });
 });
