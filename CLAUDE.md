@@ -47,8 +47,10 @@ vitest, co-located as `src/*.test.ts`. Test pure functions by **injecting facts*
 ## Commits
 
 Imperative subject; the body explains the **why**, not just the what. End with
-a `Co-Authored-By: Claude <model name> <noreply@anthropic.com>` trailer naming
-the model that did the work (e.g. `Claude Fable 5`). The repo's own git
-history is meant to demonstrate the "evolution narrative" idea — keep it legible.
+a `Co-Authored-By: Claude <model name> <noreply@anthropic.com>` trailer, where
+`<model name>` is **the model you are actually running as** (e.g. `Claude Opus
+4.8`, `Claude Fable 5`) — substitute your own, don't copy the example. The
+repo's own git history is meant to demonstrate the "evolution narrative" idea —
+keep it legible.
 (Early bootstrapping commits go straight to `main`; this moves to PR-based as the
 framework matures.)
