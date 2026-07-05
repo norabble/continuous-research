@@ -1,0 +1,61 @@
+name: scaffold-compile
+
+# Regression-guards the "the scaffolded gh-aw templates compile clean" claim.
+# scaffold.test.ts only checks the templates by string-matching (it catches
+# the known HTML-comment / escaped-backtick regressions but never runs a real
+# compile). This job scaffolds a fresh instance and runs `gh aw compile` on the
+# generated agent workflows, so a frontmatter break fails here instead of in an
+# adopter's repo.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/scaffold.ts"
+      - ".github/workflows/scaffold-compile.yml"
+  pull_request:
+    paths:
+      - "src/scaffold.ts"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: scaffold-compile-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      # gh (extension install + compile's action-SHA resolution) authenticates
+      # with the workflow token.
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      # Build so the CLI runs from its published `bin` entry (dist/cli.js) —
+      # the same artifact adopters get via `npx github:`.
+      - run: npm run build
+      - name: Scaffold a fresh instance into a temp dir
+        run: |
+          WORK="$(mktemp -d)"
+          echo "WORK=$WORK" >> "$GITHUB_ENV"
+          ( cd "$WORK" && node "$GITHUB_WORKSPACE/dist/cli.js" init )
+          # gh-aw operates on a git repo.
+          git -C "$WORK" init -q
+          test -f "$WORK/.github/workflows/interpretation.md"
+          test -f "$WORK/.github/workflows/comment-resolution.md"
+      - name: Install the gh-aw extension
+        run: gh extension install github/gh-aw
+      - name: Compile the scaffolded gh-aw workflows
+        run: |
+          cd "$WORK"
+          gh aw compile
+          # The lock files are the real success signal: no errors ⇒ they exist.
+          test -f .github/workflows/interpretation.lock.yml
+          test -f .github/workflows/comment-resolution.lock.yml
