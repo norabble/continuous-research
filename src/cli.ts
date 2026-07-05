@@ -12,7 +12,7 @@ import { createRequire } from "node:module";
 import { dirname } from "node:path";
 import { parseConfig } from "./config";
 import { helpText } from "./help";
-import { runSense, runRecordDecline, runInit } from "./commands";
+import { runSense, runRecordDecline, runInit, runImpact } from "./commands";
 import { NEXT_STEPS } from "./scaffold";
 import { execSensor, readArtifact, createGitHubPortFromEnv } from "./io";
 import { extractDeclineFromEvent } from "./event";
@@ -60,10 +60,41 @@ async function cmdRecordDecline(): Promise<number> {
   return 0;
 }
 
+function parseImpactArgs(argv: string[]): { descriptor: string; against?: string } {
+  const descriptor = argv[3];
+  if (!descriptor || descriptor.startsWith("-"))
+    throw new Error("usage: impact <descriptor> [--against <prior>]");
+  const i = argv.indexOf("--against");
+  const against = i !== -1 ? argv[i + 1] : undefined;
+  if (i !== -1 && !against) throw new Error("--against requires a prior descriptor");
+  return { descriptor, against };
+}
+
+async function cmdImpact(): Promise<number> {
+  const { descriptor, against } = parseImpactArgs(process.argv);
+  const config = parseConfig(await readFile(".research/config.json", "utf8"));
+  const port = createGitHubPortFromEnv(process.env);
+  const artifact = await runImpact({
+    config,
+    port,
+    readWorkingFile: (path) => readFile(path, "utf8"),
+    descriptor,
+    against,
+  });
+  const outPath = `.research/impact/${descriptor}.impact.json`;
+  await mkdir(dirname(outPath), { recursive: true });
+  await writeFile(outPath, `${JSON.stringify(artifact, null, 2)}\n`);
+  console.log(
+    `[impact] ${descriptor} baseline=${artifact.baseline ?? "none"} changed=${artifact.changed.length} affected=${artifact.affected.length} lint=${artifact.lint.length} → ${outPath}`,
+  );
+  return 0;
+}
+
 const COMMANDS: Record<string, () => Promise<number>> = {
   init: cmdInit,
   sense: cmdSense,
   "record-decline": cmdRecordDecline,
+  impact: cmdImpact,
 };
 
 /** Works from both src/ (tsx dev) and dist/ (built): ../package.json is the repo root. */
