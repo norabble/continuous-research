@@ -36,6 +36,8 @@ export interface GitHubPort {
    * comments must never become decline records committed to main.
    */
   latestTrustedComment(prNumber: number): Promise<string | null>;
+  /** UTF-8 content of `path` at `ref` (branch/sha/tag), or null if absent. */
+  readFileFromRef(ref: string, path: string): Promise<string | null>;
 
   // --- repo info ---
   defaultBranch(): Promise<string>;

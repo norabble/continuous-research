@@ -134,6 +134,22 @@ export class OctokitGitHubPort implements GitHubPort {
     return latestTrustedCommentBody(comments);
   }
 
+  async readFileFromRef(ref: string, path: string): Promise<string | null> {
+    try {
+      const { data } = await this.octokit.rest.repos.getContent({
+        owner: this.owner,
+        repo: this.repo,
+        path,
+        ref,
+      });
+      if (Array.isArray(data) || data.type !== "file") return null;
+      return Buffer.from(data.content, data.encoding as BufferEncoding).toString("utf8");
+    } catch (error) {
+      if (isNotFoundError(error)) return null;
+      throw error;
+    }
+  }
+
   async defaultBranch(): Promise<string> {
     const { data } = await this.octokit.rest.repos.get({ owner: this.owner, repo: this.repo });
     return data.default_branch;
