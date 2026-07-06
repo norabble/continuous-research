@@ -212,6 +212,26 @@ config schema, and the `results.json` shape:
 [cli.md → `impact`](./cli.md#impact--preview-since-v013-opt-in);
 design: [phase-2-plan](./phase-2-plan.md).
 
+## Upgrading an instance
+
+Instances pin the engine by tag, so nothing changes until you move the pin:
+
+1. Read the [release notes](https://github.com/norabble/continuous-research/releases)
+   between your current pin and the latest tag.
+2. Bump the pin in **both** engine workflows — `sense.yml` *and*
+   `decline.yml`. (Declines are rare; a stale `record-decline` pin can
+   linger unnoticed for months.)
+3. Apply any scaffold changes the notes call out. `init` never overwrites,
+   so the reliable way to see template drift is to run the new version's
+   `init` in a scratch directory and diff against your workflows. Example:
+   v0.1.3 renamed the App secrets — upgrading means setting
+   `CONTINUOUS_RESEARCH_APP_ID`/`CONTINUOUS_RESEARCH_APP_PRIVATE_KEY` and
+   updating the token-mint step in `sense.yml` to match.
+4. If any agentic `.md` workflow changed, `gh aw compile` and commit the
+   regenerated locks.
+5. Dispatch **sense** once — a healthy `none`/`skip` confirms the new pin
+   runs end-to-end.
+
 ## Guardrails you should keep
 
 The scaffold ships these; keep them when you customize:
