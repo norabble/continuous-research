@@ -14,7 +14,7 @@ describe("helpText", () => {
       expect(text).toContain(name);
       expect(text).toContain(summary);
     }
-    expect(CLI_COMMANDS.map((c) => c.name)).toEqual(["init", "sense", "record-decline"]);
+    expect(CLI_COMMANDS.map((c) => c.name)).toEqual(["init", "sense", "record-decline", "impact"]);
   });
 
   it("documents the environment the engine commands need", () => {

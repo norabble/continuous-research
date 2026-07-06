@@ -102,17 +102,61 @@ untrusted comments are never quoted into the record), falling back to
 `Closed without merge; no reason provided.`, and commits
 `.research/decisions/<descriptor>.md` directly to the default branch.
 
+### `impact` — _unreleased (on `main`; not in `v0.1.2`)_
+
+The deterministic half of the Phase-2 **mechanical impact layer**
+([build plan](./phase-2-plan.md)). Opt-in: it refuses to run unless the
+config's `impact.enabled` is `true`, and disabling it never affects the
+sensing loop.
+
+```
+continuous-research impact <descriptor> [--against <prior-descriptor>]
+```
+
+**Environment (required):** `GITHUB_TOKEN`/`GH_TOKEN` and
+`GITHUB_REPOSITORY`, as for `sense` (prior-edition reads come from the
+default branch via the API).
+
+**Behavior:**
+
+1. Read the edition's `results.json` from the working tree at
+   `impact.resultsPath` (with `${descriptor}` substituted) and parse the
+   claim annotations from the findings file (`impact.findings`, default
+   `findings.md`; grammar: `<!-- claim: <id> | backs: <keys> | status:
+   <status> -->` — see the [Phase-2 plan](./phase-2-plan.md)).
+2. With `--against <prior>`: read the **prior** edition's `results.json`
+   from the **default branch** and diff — the changed keys, as dotted leaf
+   paths. **Fail-closed:** a named baseline with no committed results is an
+   error, never an empty diff. Without `--against`: no diff (first edition).
+3. Select the **affected claims** — those whose `backs:` key changed
+   (segment-boundary matching, so `close` never matches `close_vs_ma7_pct`).
+4. Run the **consistency-linter** (advisory findings, never a merge gate;
+   skipped if `impact.linter` is `false`).
+5. Write `.research/impact/<descriptor>.impact.json`:
+   `{ edition, baseline, changed, affected, lint }` — the cheap, exact
+   "which claims to re-examine" the interpretation agent is fed.
+
 ## Config — `.research/config.json`
 
 ```json
 {
-  "sensor": "node sensor.mjs"
+  "sensor": "node sensor.mjs",
+  "impact": {
+    "enabled": true,
+    "resultsPath": "data/btcusd/${descriptor}.json"
+  }
 }
 ```
 
 | Key | Type | Meaning |
 | --- | --- | --- |
 | `sensor` | string, required | shell command the engine executes to detect new data |
+| `impact` | object, optional | Phase-2 mechanical impact layer; absent ⇒ layer off |
+| `impact.enabled` | boolean, required in block | master toggle for the impact diff + linter |
+| `impact.resultsPath` | string | where an edition's `results.json` lives; `${descriptor}` is substituted (required to run `impact`) |
+| `impact.findings` | string | prose file the claim annotations are parsed from (default `findings.md`) |
+| `impact.linter` | boolean | consistency-linter on/off (default on when enabled) |
+| `impact.agentEngine` | `"gh-aw"` \| `"claude-code"` | which substrate `init` scaffolds the agent body for |
 
 The sensor (like the workflow files themselves) is trusted code: anyone who
 can edit it controls what runs in CI. Review changes to it like workflow

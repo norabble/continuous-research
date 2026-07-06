@@ -94,6 +94,8 @@ Two documents get a project from zero to a live loop:
 Phase 1 complete (2026-07-03): `init` scaffolds the proven instance
 configuration, and the full loop — including agentic interpretation and
 comment-resolution — is qualified live in the sample on the shipped
-distribution. Phase 2 (the mechanical impact layer, consistency-linter,
-judgment review, `resolves_when`, the storage-policy advisor) has not
-started. See the [plan](./docs/phase-1-plan.md) for the record.
+distribution. Phase 2 is **in progress** ([plan](./docs/phase-2-plan.md)):
+the mechanical impact layer's engine half (`impact` command + consistency
+linter) is on `main`, unreleased; judgment review, `resolves_when`, and the
+storage-policy advisor have not started. Phase 1's record:
+[phase-1-plan](./docs/phase-1-plan.md).

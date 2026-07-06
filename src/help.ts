@@ -8,6 +8,10 @@ export const CLI_COMMANDS: ReadonlyArray<{ name: string; summary: string }> = [
   { name: "init", summary: "scaffold .research/ + workflows into the current repo" },
   { name: "sense", summary: "run the declared sensor, dedup, propose the data-PR" },
   { name: "record-decline", summary: "commit the decline record for a closed-unmerged data-PR" },
+  {
+    name: "impact",
+    summary: "diff results vs a prior edition; write the impact artifact (opt-in)",
+  },
 ];
 
 export function helpText(version: string): string {
