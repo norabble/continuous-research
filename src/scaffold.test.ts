@@ -36,12 +36,12 @@ describe("scaffoldFiles", () => {
     const sense = byPath(".github/workflows/sense.yml");
     expect(sense).toContain("actions/create-github-app-token@v2");
     // Literal Actions expressions must survive (not TS interpolation).
-    expect(sense).toContain("app-id: ${{ secrets.APP_ID }}");
+    expect(sense).toContain("app-id: ${{ secrets.CONTINUOUS_RESEARCH_APP_ID }}");
     expect(sense).toContain("GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}");
     expect(sense).toContain("concurrency:");
     expect(sense).toContain("timeout-minutes:");
     // The engine ref is pinned — instances upgrade deliberately, not on HEAD.
-    expect(sense).toContain("npx --yes github:norabble/continuous-research#v0.1.2 sense");
+    expect(sense).toContain("npx --yes github:norabble/continuous-research#v0.1.3 sense");
     // The workflow's own token stays read-only; the App does the writes.
     expect(sense).toContain("contents: read");
   });

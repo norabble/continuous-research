@@ -1,6 +1,6 @@
 {
   "name": "@norabble/continuous-research",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "private": true,
   "description": "Framework for Continuous Research — config CLI + runtime engine. See CONCEPT.md and docs/phase-1-plan.md.",
   "type": "module",

@@ -42,7 +42,7 @@ Merge authority stays with you. Agents only ever propose.
 In the repo root (new or existing project — `init` never overwrites):
 
 ```sh
-npx --yes github:norabble/continuous-research#v0.1.2 init
+npx --yes github:norabble/continuous-research#v0.1.3 init
 ```
 
 This scaffolds `.research/config.json` plus four workflows
@@ -79,8 +79,12 @@ trigger it; see *Driving the loop locally* below.
 4. **Install App** → your account/org → *Only select repositories* → the
    instance repo.
 5. In the instance repo, set two Actions secrets:
-   `APP_ID` (the App's numeric ID) and `APP_PRIVATE_KEY` (the full `.pem`
-   contents).
+   `CONTINUOUS_RESEARCH_APP_ID` (the App's numeric ID) and
+   `CONTINUOUS_RESEARCH_APP_PRIVATE_KEY` (the full `.pem` contents). The
+   names are deliberately prefixed: bare `APP_ID` is the de-facto default
+   from `create-github-app-token` examples, so an unprefixed name can
+   collide with another integration's secret in the same repo — or silently
+   inherit a *different* App from an org-level secret.
 
 **Reusing an existing App** for a new instance: Settings → GitHub Apps →
 your App → Configure → add the repository (or
@@ -180,7 +184,7 @@ for qualifying a sensor before the App is wired:
 
 ```sh
 GITHUB_TOKEN=$(gh auth token) GITHUB_REPOSITORY=<owner>/<repo> \
-  npx --yes github:norabble/continuous-research#v0.1.2 sense
+  npx --yes github:norabble/continuous-research#v0.1.3 sense
 ```
 
 Know what changes in this mode:
@@ -202,10 +206,10 @@ findings prose, commit a machine-comparable `results.json` per edition, and
 the `impact` command diffs editions, names the exact claims affected, and
 lint-checks annotation↔results consistency — so the interpretation agent is
 fed a cheap, precise "re-examine these" instead of the raw artifacts. It is
-**unreleased** (on `main`, not in the `v0.1.2` pin) and off unless
-`impact.enabled` is set; enabling or disabling it never affects the sensing
-loop. Command, config schema, and the `results.json` shape:
-[cli.md → `impact`](./cli.md#impact--unreleased--on-main-not-in-v012);
+a **preview** (shipped since `v0.1.3`) and off unless `impact.enabled` is
+set; enabling or disabling it never affects the sensing loop. Command,
+config schema, and the `results.json` shape:
+[cli.md → `impact`](./cli.md#impact--preview-since-v013-opt-in);
 design: [phase-2-plan](./phase-2-plan.md).
 
 ## Guardrails you should keep
@@ -229,7 +233,7 @@ The scaffold ships these; keep them when you customize:
 
 | Symptom | Cause / fix |
 | --- | --- |
-| Data-PR opens but interpretation never fires | The PR wasn't App-authored (check the PR author is `your-app[bot]`): `APP_ID`/`APP_PRIVATE_KEY` missing or the sense workflow isn't using the minted token. Or `bots:` in `interpretation.md` doesn't match your App slug. Recompile after edits. |
+| Data-PR opens but interpretation never fires | The PR wasn't App-authored (check the PR author is `your-app[bot]`): `CONTINUOUS_RESEARCH_APP_ID`/`CONTINUOUS_RESEARCH_APP_PRIVATE_KEY` missing (instances scaffolded before v0.1.3 used bare `APP_ID`/`APP_PRIVATE_KEY` — match whatever your `sense.yml` references) or the sense workflow isn't using the minted token. Or `bots:` in `interpretation.md` doesn't match your App slug. Recompile after edits. |
 | `sense` fails: `GitHub Actions is not permitted to create ... pull requests` | Enable "Allow GitHub Actions to create and approve pull requests" — repo **and** org level. |
 | `sense` fails parsing sensor output | The sensor must print exactly one JSON object to stdout ([contract](./cli.md#sensor-contract)); send logs to stderr. |
 | Decline record says "no reason provided" despite a closing comment | On org-owned repos the workflow's `GITHUB_TOKEN` can't see **private** org membership, so a private MEMBER's comment reads as untrusted (`author_association: NONE`). Make the membership public, or accept the fallback text. [Details](./cli.md#record-decline). |

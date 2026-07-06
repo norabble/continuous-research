@@ -96,6 +96,6 @@ configuration, and the full loop — including agentic interpretation and
 comment-resolution — is qualified live in the sample on the shipped
 distribution. Phase 2 is **in progress** ([plan](./docs/phase-2-plan.md)):
 the mechanical impact layer's engine half (`impact` command + consistency
-linter) is on `main`, unreleased; judgment review, `resolves_when`, and the
-storage-policy advisor have not started. Phase 1's record:
-[phase-1-plan](./docs/phase-1-plan.md).
+linter) ships as an opt-in preview since `v0.1.3`; judgment review,
+`resolves_when`, and the storage-policy advisor have not started. Phase 1's
+record: [phase-1-plan](./docs/phase-1-plan.md).

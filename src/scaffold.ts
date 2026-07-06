@@ -58,15 +58,15 @@ jobs:
         id: app-token
         uses: actions/create-github-app-token@v2
         with:
-          app-id: \${{ secrets.APP_ID }}
-          private-key: \${{ secrets.APP_PRIVATE_KEY }}
+          app-id: \${{ secrets.CONTINUOUS_RESEARCH_APP_ID }}
+          private-key: \${{ secrets.CONTINUOUS_RESEARCH_APP_PRIVATE_KEY }}
       - name: sense
         env:
           GITHUB_TOKEN: \${{ steps.app-token.outputs.token }}
         # If the framework is not reachable via npx in your setup, vendor the
         # engine bundle into the repo and use:
         #   run: node engine/continuous-research.mjs sense
-        run: npx --yes github:norabble/continuous-research#v0.1.2 sense
+        run: npx --yes github:norabble/continuous-research#v0.1.3 sense
 `;
 
 const DECLINE_WORKFLOW = `name: decline
@@ -96,7 +96,7 @@ jobs:
       - name: record-decline
         env:
           GITHUB_TOKEN: \${{ secrets.GITHUB_TOKEN }}
-        run: npx --yes github:norabble/continuous-research#v0.1.2 record-decline
+        run: npx --yes github:norabble/continuous-research#v0.1.3 record-decline
 `;
 
 const INTERPRETATION_WORKFLOW = `---
@@ -248,8 +248,9 @@ Next steps:
      detection-result JSON on stdout, and writes artifacts to the working tree.
   2. GitHub App (required): create an App (permissions: Contents, Issues, and
      Pull requests — read & write), install it on this repo, and set the
-     APP_ID and APP_PRIVATE_KEY secrets. Data-PRs must be App-authored, or the
-     interpretation workflow never triggers.
+     CONTINUOUS_RESEARCH_APP_ID + CONTINUOUS_RESEARCH_APP_PRIVATE_KEY
+     secrets. Data-PRs must be App-authored, or the interpretation workflow
+     never triggers.
   3. Agent workflows: fill in the TODOs in
      .github/workflows/interpretation.md and comment-resolution.md, set your
      inference secret (e.g. GEMINI_API_KEY), then compile them:

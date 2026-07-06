@@ -11,11 +11,11 @@ edition, data-PR, provenance stub, decline record) is defined in
 
 | Context | Command |
 | --- | --- |
-| An instance's CI (the normal path) | `npx --yes github:norabble/continuous-research#v0.1.2 <command>` |
+| An instance's CI (the normal path) | `npx --yes github:norabble/continuous-research#v0.1.3 <command>` |
 | Framework development | `npm run cli -- <command>` |
 | No-npx fallback | vendor the bundle (`npm run build:bundle` → `bundle/continuous-research.mjs`) into the instance repo and `node engine/continuous-research.mjs <command>` |
 
-Pin a tag (`#v0.1.2`), never a branch — the scaffold does this for you.
+Pin a tag (`#v0.1.3`), never a branch — the scaffold does this for you.
 `--version` prints the resolved version; `--help` summarizes this page.
 
 ## Commands
@@ -115,7 +115,7 @@ untrusted comments are never quoted into the record), falling back to
 > record falls back to the default text. Make your org membership public if
 > you want closing comments captured on org-owned instances.
 
-### `impact` — _unreleased (on `main`; not in `v0.1.2`)_
+### `impact` — _preview (since `v0.1.3`; opt-in)_
 
 The deterministic half of the Phase-2 **mechanical impact layer**
 ([build plan](./phase-2-plan.md)). Opt-in: it refuses to run unless the
