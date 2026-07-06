@@ -109,7 +109,7 @@ function impactExcerpt(md: string): string {
 function renderUpdateCard(update: PendingUpdate): string {
   const excerpt = update.impactMd
     ? escapeText(impactExcerpt(update.impactMd))
-    : escapeText(COPY.assessmentPending);
+    : COPY.assessmentPending;
   const descriptor = escapeText(update.descriptor);
   return `
     <article class="card">

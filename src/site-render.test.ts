@@ -71,6 +71,22 @@ describe("renderSite index", () => {
     expect(html).not.toContain("<script>");
   });
 
+  it("escapes hostile content arriving via the impact-excerpt path", () => {
+    const html = index({
+      ...base,
+      updates: [
+        {
+          descriptor: "d4",
+          proposedAt: "2026-07-05T00:00:00Z",
+          impactMd: "<script>alert(1)</script>",
+          provenance: null,
+          githubUrl: "u",
+        },
+      ],
+    });
+    expect(html).not.toContain("<script");
+  });
+
   // --- Additional coverage beyond the brief's tests ---
 
   it("escapes hostile content in the title and description", () => {
