@@ -82,7 +82,13 @@ it from the repository root; artifact paths are repo-root-relative.
 **Running locally:** artifacts are read from the *local* working tree, but
 the `data/<descriptor>` branch is created from the **remote** default
 branch's head. Push your latest commits before running `sense` locally, or
-the data-PR's base may not contain the sensor that produced it.
+the data-PR's base may not contain the sensor that produced it. Two more
+local-mode facts: (1) PRs opened with a **personal** token (e.g.
+`GITHUB_TOKEN=$(gh auth token)`) **do** trigger the interpretation workflow
+— unlike CI's workflow-issued token — so every local proposal spends real
+agent quota; (2) the sensor mutates the working tree (artifacts, any
+registry state it keeps), which later collides with `git pull` once the PR
+merges — drive local runs from a disposable clone.
 
 ### `record-decline`
 
@@ -101,6 +107,13 @@ comment** on the PR (author-association OWNER / MEMBER / COLLABORATOR;
 untrusted comments are never quoted into the record), falling back to
 `Closed without merge; no reason provided.`, and commits
 `.research/decisions/<descriptor>.md` directly to the default branch.
+
+> **Org-repo caveat:** `author_association` is computed relative to the
+> *requesting token*. The decline workflow runs on the workflow-issued
+> `GITHUB_TOKEN`, which cannot see **private** org membership — a private
+> MEMBER therefore reads as `NONE`, their comment is untrusted, and the
+> record falls back to the default text. Make your org membership public if
+> you want closing comments captured on org-owned instances.
 
 ### `impact` — _unreleased (on `main`; not in `v0.1.2`)_
 
@@ -136,6 +149,19 @@ default branch via the API).
    `{ edition, baseline, changed, affected, lint }` — the cheap, exact
    "which claims to re-examine" the interpretation agent is fed.
 
+**`results.json` shape:** any JSON object. It is flattened to **dotted leaf
+paths** (`google.free.gemini-3.1-flash-lite.rpd`); arrays are leaves,
+compared whole. `backs:` keys address those dotted paths, and a key also
+covers everything beneath it (`google.free` matches `google.free.*`). Derive
+`results.json` as the *machine-comparable* view of an edition — semantic
+keys and values, not raw extracted markup.
+
+**Path constraint:** `${descriptor}` is the **only** substitution
+`impact.resultsPath` performs — the template must locate the file from the
+descriptor alone. If your descriptors encode a family the path nests by
+(`limits-google-3fa9c21b` under `data/limits/google/…`), the template cannot
+extract it: store results flat instead (e.g. `results/${descriptor}.json`).
+
 ## Config — `.research/config.json`
 
 ```json
@@ -156,7 +182,7 @@ default branch via the API).
 | `impact.resultsPath` | string | where an edition's `results.json` lives; `${descriptor}` is substituted (required to run `impact`) |
 | `impact.findings` | string | prose file the claim annotations are parsed from (default `findings.md`) |
 | `impact.linter` | boolean | consistency-linter on/off (default on when enabled) |
-| `impact.agentEngine` | `"gh-aw"` \| `"claude-code"` | which substrate `init` scaffolds the agent body for |
+| `impact.agentEngine` | `"gh-aw"` \| `"claude-code"` | **reserved** — validated but not yet acted on; a future `init` will scaffold the agent body for the chosen substrate |
 
 The sensor (like the workflow files themselves) is trusted code: anyone who
 can edit it controls what runs in CI. Review changes to it like workflow

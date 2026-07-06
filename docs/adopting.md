@@ -50,7 +50,11 @@ This scaffolds `.research/config.json` plus four workflows
 
 1. **Wire your sensor.** Point `"sensor"` in `.research/config.json` at your
    detection command. Start deterministic (fetch → hash → compare); you can
-   move along the deterministic↔agentic spectrum later.
+   move along the deterministic↔agentic spectrum later. Hash the
+   *substance*, and **pin content negotiation**: send an `Accept-Language`
+   header (and any locale query parameter) on every fetch — providers rotate
+   served translations and A/B markup per request, which otherwise mints
+   several spurious "editions" from one real content-state.
 2. **Leave the cron commented out** in `sense.yml` until the first manual
    run succeeds. When you enable it, match the cadence to the data's real
    rhythm — dedup makes re-runs safe, so err frequent only if runs are cheap.
@@ -58,9 +62,11 @@ This scaffolds `.research/config.json` plus four workflows
 ## The GitHub App (required, ~10 minutes)
 
 Data-PRs must be opened by a **GitHub App identity**. This is load-bearing,
-not bureaucracy: PRs opened with the default `GITHUB_TOKEN` **never trigger
-downstream workflows** (GitHub's anti-recursion rule), so interpretation
-would simply never run.
+not bureaucracy: PRs opened with the workflow-issued `GITHUB_TOKEN` **never
+trigger downstream workflows** (GitHub's anti-recursion rule, specific to
+Actions-issued tokens), so interpretation would simply never run in CI. PRs
+opened with a *personal* token — e.g. when driving the loop locally — do
+trigger it; see *Driving the loop locally* below.
 
 **Create one** (once per org/user; reusable across instances):
 
@@ -148,18 +154,59 @@ workflows: the agent runs read-only; writes land only through sanitized
    provenance stub + artifacts.
 2. Within a minute or two the **interpretation** workflow should fire on that
    PR and push the impact declaration onto its branch. If it never fires, see
-   *Troubleshooting* — this is almost always token identity.
+   *Troubleshooting* — this is almost always token identity. **Let it finish
+   before merging or closing the PR:** finishing the PR early doesn't cancel
+   the run — it keeps going, spends Actions minutes and inference quota, and
+   its writes then land nowhere (the run reports `success` with zero effect,
+   by design). On a small daily quota those wasted sessions add up.
 3. Re-dispatch **sense** while the PR is open → `{"action":"skip","state":"pending"}`.
    No duplicate. This is dedup working.
 4. **Merge** the PR, dispatch again → `skip/merged` (read off the provenance
    stub on the default branch).
 5. Optional: force a fresh descriptor, close its PR unmerged with a comment →
    the **decline** workflow commits `.research/decisions/<descriptor>.md`
-   with your comment as the reason; re-dispatch → `skip/declined`.
+   with your comment as the reason; re-dispatch → `skip/declined`. (On
+   org-owned repos with **private** membership, the reason falls back to the
+   default text — see *Troubleshooting*.)
 6. Try `/resolve <some small request>` as a comment on a data-PR — the
    comment-resolution agent should push the change and reply once.
 
 When all of that holds, uncomment the cron. The loop is live.
+
+## Driving the loop locally
+
+CI is the loop's home, but you can drive the engine from a checkout — useful
+for qualifying a sensor before the App is wired:
+
+```sh
+GITHUB_TOKEN=$(gh auth token) GITHUB_REPOSITORY=<owner>/<repo> \
+  npx --yes github:norabble/continuous-research#v0.1.2 sense
+```
+
+Know what changes in this mode:
+
+- **Your personal token is not the Actions token**, so the data-PRs it opens
+  **do trigger the interpretation workflow** — every local proposal spends
+  real inference quota. Budget for it (or hold off setting the inference
+  secret until you want interpretation live).
+- **Run from a disposable clone.** The sensor writes artifacts (and any
+  registry state) into the working tree; after the data-PR merges, that
+  residue collides with `git pull` in the checkout you ran from.
+- **Push before you run** — the data-PR branches from the *remote* default
+  branch head ([details](./cli.md#sense)).
+
+## The mechanical impact layer (Phase 2 — preview)
+
+An opt-in deterministic layer above the loop: annotate claims in your
+findings prose, commit a machine-comparable `results.json` per edition, and
+the `impact` command diffs editions, names the exact claims affected, and
+lint-checks annotation↔results consistency — so the interpretation agent is
+fed a cheap, precise "re-examine these" instead of the raw artifacts. It is
+**unreleased** (on `main`, not in the `v0.1.2` pin) and off unless
+`impact.enabled` is set; enabling or disabling it never affects the sensing
+loop. Command, config schema, and the `results.json` shape:
+[cli.md → `impact`](./cli.md#impact--unreleased--on-main-not-in-v012);
+design: [phase-2-plan](./phase-2-plan.md).
 
 ## Guardrails you should keep
 
@@ -185,6 +232,7 @@ The scaffold ships these; keep them when you customize:
 | Data-PR opens but interpretation never fires | The PR wasn't App-authored (check the PR author is `your-app[bot]`): `APP_ID`/`APP_PRIVATE_KEY` missing or the sense workflow isn't using the minted token. Or `bots:` in `interpretation.md` doesn't match your App slug. Recompile after edits. |
 | `sense` fails: `GitHub Actions is not permitted to create ... pull requests` | Enable "Allow GitHub Actions to create and approve pull requests" — repo **and** org level. |
 | `sense` fails parsing sensor output | The sensor must print exactly one JSON object to stdout ([contract](./cli.md#sensor-contract)); send logs to stderr. |
+| Decline record says "no reason provided" despite a closing comment | On org-owned repos the workflow's `GITHUB_TOKEN` can't see **private** org membership, so a private MEMBER's comment reads as untrusted (`author_association: NONE`). Make the membership public, or accept the fallback text. [Details](./cli.md#record-decline). |
 | `Invalid descriptor` | Descriptors must match `/^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$/` — lowercase, no leading/trailing punctuation. |
 | `gh aw compile` errors on the scaffolded `.md` | Fill the `TODO`s first (an unreplaced `your-app-slug` is invalid); check the gh-aw version pinned in the `.lock.yml` header if recompiling an old instance. |
 | Agent run starts, then fails without writing | Usually model quota (fail-closed by design) or a model that can't complete gh-aw's protocol — check the run log; prefer the proven model. |
