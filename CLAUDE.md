@@ -52,5 +52,9 @@ a `Co-Authored-By: Claude <model name> <noreply@anthropic.com>` trailer, where
 4.8`, `Claude Fable 5`) — substitute your own, don't copy the example. The
 repo's own git history is meant to demonstrate the "evolution narrative" idea —
 keep it legible.
-(Early bootstrapping commits go straight to `main`; this moves to PR-based as the
-framework matures.)
+
+**Branch, don't commit to `main`.** Changes land via a **feature branch → PR**;
+`main` is PR-gated and human-merged (the direct-to-`main` bootstrapping phase is
+over). Branch from up-to-date `main`, push the branch over HTTPS, open the PR
+with `gh pr create`, and leave the merge to the maintainer. Releases go the same
+way — the `release` skill cuts the version bump on a branch + PR before tagging.
