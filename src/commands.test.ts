@@ -6,6 +6,7 @@ import type { GitHubPort } from "./ports";
 function portWith(overrides: Partial<GitHubPort>): GitHubPort {
   return {
     listPullRequestsByLabel: () => Promise.resolve([]),
+    listOpenPullRequests: () => Promise.resolve([]),
     provenanceStubExists: () => Promise.resolve(false),
     latestTrustedComment: () => Promise.resolve(null),
     readFileFromRef: () => Promise.resolve(null),

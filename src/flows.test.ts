@@ -15,6 +15,7 @@ function recordingPort(): { port: GitHubPort; calls: string[] } {
   const calls: string[] = [];
   const port: GitHubPort = {
     listPullRequestsByLabel: () => Promise.resolve([]),
+    listOpenPullRequests: () => Promise.resolve([]),
     provenanceStubExists: () => Promise.resolve(false),
     latestTrustedComment: () => Promise.resolve(null),
     readFileFromRef: () => Promise.resolve(null),

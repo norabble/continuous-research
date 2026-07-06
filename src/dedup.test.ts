@@ -16,6 +16,7 @@ function portWith(overrides: Partial<GitHubPort>): GitHubPort {
     Promise.reject(new Error(`${name} not implemented in this fake`));
   return {
     listPullRequestsByLabel: () => Promise.resolve([]),
+    listOpenPullRequests: () => Promise.resolve([]),
     provenanceStubExists: () => Promise.resolve(false),
     latestTrustedComment: () => Promise.resolve(null),
     readFileFromRef: () => Promise.resolve(null),
