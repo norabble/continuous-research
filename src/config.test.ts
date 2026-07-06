@@ -42,3 +42,20 @@ describe("parseConfig — impact block", () => {
     ).toThrow(/agentEngine/);
   });
 });
+
+describe("parseConfig — site block", () => {
+  it("parses the optional site block", () => {
+    const c = parseConfig('{"sensor":"x","site":{"enabled":true,"title":"T","description":"D"}}');
+    expect(c.site).toEqual({ enabled: true, title: "T", description: "D" });
+  });
+
+  it("rejects a site block without boolean enabled", () => {
+    expect(() => parseConfig('{"sensor":"x","site":{"title":"T"}}')).toThrow(
+      'config "site.enabled" must be a boolean',
+    );
+  });
+
+  it("omits site when absent", () => {
+    expect(parseConfig('{"sensor":"x"}').site).toBeUndefined();
+  });
+});
