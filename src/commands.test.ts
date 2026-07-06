@@ -198,4 +198,28 @@ describe("runImpact", () => {
       },
     ]);
   });
+
+  it("throws when --against names a baseline whose results are absent (fail closed)", async () => {
+    await expect(
+      runImpact({
+        config,
+        port: portWith({ readFileFromRef: () => Promise.resolve(null) }),
+        readWorkingFile: (p) =>
+          Promise.resolve(p === "findings.md" ? findings : JSON.stringify({ close: 100 })),
+        descriptor: "btcusd-2026-07-01",
+        against: "btcusd-2026-06-30",
+      }),
+    ).rejects.toThrow(/btcusd-2026-06-30/);
+  });
+
+  it("rejects an invalid descriptor before touching the filesystem", async () => {
+    await expect(
+      runImpact({
+        config,
+        port: portWith({}),
+        readWorkingFile: () => Promise.resolve("{}"),
+        descriptor: "../evil",
+      }),
+    ).rejects.toThrow(/Invalid descriptor/);
+  });
 });

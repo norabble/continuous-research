@@ -15,6 +15,7 @@ import { dedupe } from "./dedup";
 import { buildProvenanceStub } from "./provenance";
 import { proposeDataPR, recordDecline } from "./flows";
 import { scaffoldFiles } from "./scaffold";
+import { assertDescriptor } from "./descriptor";
 import type { ChangedKey } from "./results";
 import { diffResults, resolveResultsPath } from "./results";
 import { parseAnnotations, type ClaimIndex } from "./annotations";
@@ -119,6 +120,10 @@ export async function runImpact(deps: ImpactDeps): Promise<ImpactArtifact> {
   const impact = deps.config.impact;
   if (!impact?.enabled) throw new Error("impact layer is disabled (config.impact.enabled)");
   if (!impact.resultsPath) throw new Error("config.impact.resultsPath is required");
+  // Descriptors flow into fs paths (resultsPath, the .impact.json output); validate
+  // them the way the label/branch helpers do on the sense/decline paths.
+  assertDescriptor(deps.descriptor);
+  if (deps.against) assertDescriptor(deps.against);
   const findingsPath = impact.findings ?? "findings.md";
 
   const next: unknown = JSON.parse(
@@ -131,11 +136,15 @@ export async function runImpact(deps: ImpactDeps): Promise<ImpactArtifact> {
   let priorIndex: ClaimIndex | undefined;
   if (deps.against) {
     const base = await deps.port.defaultBranch();
-    const priorRaw = await deps.port.readFileFromRef(
-      base,
-      resolveResultsPath(impact.resultsPath, deps.against),
-    );
-    const prev: unknown = priorRaw ? JSON.parse(priorRaw) : {};
+    const priorPath = resolveResultsPath(impact.resultsPath, deps.against);
+    const priorRaw = await deps.port.readFileFromRef(base, priorPath);
+    // Fail closed: a named baseline whose results are absent is an error, not an
+    // empty diff. Treating it as {} would guess a baseline (every key "added")
+    // and stamp it as real — contradicting "no guessed baseline".
+    if (priorRaw === null) {
+      throw new Error(`--against ${deps.against}: no results at ${priorPath} on ${base}`);
+    }
+    const prev: unknown = JSON.parse(priorRaw);
     changed = diffResults(prev, next);
     baseline = deps.against;
     const priorFindings = await deps.port.readFileFromRef(base, findingsPath);
