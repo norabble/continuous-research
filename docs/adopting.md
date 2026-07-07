@@ -42,7 +42,7 @@ Merge authority stays with you. Agents only ever propose.
 In the repo root (new or existing project — `init` never overwrites):
 
 ```sh
-npx --yes github:norabble/continuous-research#v0.1.3 init
+npx --yes github:norabble/continuous-research#v0.1.5 init
 ```
 
 This scaffolds `.research/config.json` plus four workflows
@@ -184,7 +184,7 @@ for qualifying a sensor before the App is wired:
 
 ```sh
 GITHUB_TOKEN=$(gh auth token) GITHUB_REPOSITORY=<owner>/<repo> \
-  npx --yes github:norabble/continuous-research#v0.1.3 sense
+  npx --yes github:norabble/continuous-research#v0.1.5 sense
 ```
 
 Know what changes in this mode:
@@ -211,6 +211,33 @@ set; enabling or disabling it never affects the sensing loop. Command,
 config schema, and the `results.json` shape:
 [cli.md → `impact`](./cli.md#impact--preview-since-v013-opt-in);
 design: [phase-2-plan](./phase-2-plan.md).
+
+## Publishing the live site
+
+An opt-in, entirely read-only site for **followers of the research** —
+readers who understand the findings but not GitHub. It renders
+`findings.md` as the current findings, each open data-PR as a proposed
+update ("awaiting the author's review," with an evidence record and an
+excerpt of its impact assessment), and a quiet maintenance list for
+everything else — no PR numbers, diffs, or other GitHub chrome. Command,
+config schema, and exactly what it gathers:
+[cli.md → `site`](./cli.md#site).
+
+**Enable it:**
+
+1. Set `site.enabled: true` (and a `title`) in `.research/config.json`.
+2. Repo **Settings → Pages → Source: "GitHub Actions"**.
+3. Dispatch the scaffolded **site** workflow (Actions → *site* → *Run
+   workflow*). It also rebuilds on data-PR events and on pushes to the
+   default branch that touch `findings.md` or `.research/`.
+
+**Private repos:** GitHub Pages requires a **public** repository on free
+plans. A private instance can still run the `site` build — it just skips
+the deploy steps, so the workflow stays green while producing no live
+page — or leave the workflow disabled until you're ready to publish.
+
+**Fail-closed:** a failed build never touches the deployed site — the
+previously published pages stay up until the next successful run.
 
 ## Upgrading an instance
 

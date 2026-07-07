@@ -11,11 +11,11 @@ edition, data-PR, provenance stub, decline record) is defined in
 
 | Context | Command |
 | --- | --- |
-| An instance's CI (the normal path) | `npx --yes github:norabble/continuous-research#v0.1.3 <command>` |
+| An instance's CI (the normal path) | `npx --yes github:norabble/continuous-research#v0.1.5 <command>` |
 | Framework development | `npm run cli -- <command>` |
 | No-npx fallback | vendor the bundle (`npm run build:bundle` → `bundle/continuous-research.mjs`) into the instance repo and `node engine/continuous-research.mjs <command>` |
 
-Pin a tag (`#v0.1.3`), never a branch — the scaffold does this for you.
+Pin a tag (`#v0.1.5`), never a branch — the scaffold does this for you.
 `--version` prints the resolved version; `--help` summarizes this page.
 
 ## Commands
@@ -162,6 +162,57 @@ descriptor alone. If your descriptors encode a family the path nests by
 (`limits-google-3fa9c21b` under `data/limits/google/…`), the template cannot
 extract it: store results flat instead (e.g. `results/${descriptor}.json`).
 
+### `site`
+
+Builds the read-only static site — the follower-facing view of the project
+(current findings, updates awaiting review, a quiet maintenance list) — into
+`_site/`. Opt-in: it refuses to do anything unless `site.enabled` is `true`
+in the config, and disabling it never affects the sensing or impact layers.
+
+```
+continuous-research site
+```
+
+**Environment (required):** `GITHUB_TOKEN`/`GH_TOKEN` and
+`GITHUB_REPOSITORY`, as for `sense` — used **read-only** (listing open PRs,
+reading files by ref); the site build never writes to GitHub.
+
+**Behavior, in order:**
+
+1. `site` absent, or `site.enabled` not `true` ⇒ exit 0, `[site] disabled —
+   nothing to do`. No GitHub call is made.
+2. List open pull requests. **Trust rule:** only PRs authored by a bot
+   identity appear on the site at all — a non-bot PR is excluded entirely,
+   even if someone applies a `data:` label.
+3. Among the bot-authored PRs: one carrying a `data:<descriptor>` label
+   becomes a **pending update** — its impact declaration
+   (`.research/impact/<descriptor>.md`) and provenance stub are read from
+   the PR's **head ref**, not the default branch (no impact declaration yet
+   ⇒ rendered as "assessment in progress"). One without a data label becomes
+   a **maintenance** item.
+4. Read `findings.md` from the **default branch** for the current-findings
+   section.
+5. Render the site files; the CLI writes each one under `_site/`, then logs
+   `[site] wrote N files to _site/`.
+
+**Output (under `_site/`):**
+
+| File | Contents |
+| --- | --- |
+| `index.html` | header, current findings, pending updates (each a card with a 5-line expandable excerpt), maintenance |
+| `updates/<descriptor>.html` | one per pending update: the full impact body, an evidence record (source / retrieved / hash), the review note, and one GitHub link |
+| `style.css` | the shared stylesheet (light/dark) |
+
+All markdown that reaches the page (findings, impact bodies) is untrusted,
+agent-written content and is sanitized before it becomes HTML: raw HTML is
+escaped rather than parsed, unsafe link/image schemes (`javascript:`,
+`data:`, protocol-relative `//…`, …) are neutralized to `#`, and claim
+annotations (`<!-- claim: ... -->`) are stripped.
+
+**Fail-closed:** any error gathering data or rendering exits 1 (message on
+stderr) before anything is written to `_site/` — a scaffolded deploy step
+then never runs, and the previously published site stays up.
+
 ## Config — `.research/config.json`
 
 ```json
@@ -170,6 +221,10 @@ extract it: store results flat instead (e.g. `results/${descriptor}.json`).
   "impact": {
     "enabled": true,
     "resultsPath": "data/btcusd/${descriptor}.json"
+  },
+  "site": {
+    "enabled": true,
+    "title": "BTC-USD, continuously"
   }
 }
 ```
@@ -183,6 +238,10 @@ extract it: store results flat instead (e.g. `results/${descriptor}.json`).
 | `impact.findings` | string | prose file the claim annotations are parsed from (default `findings.md`) |
 | `impact.linter` | boolean | consistency-linter on/off (default on when enabled) |
 | `impact.agentEngine` | `"gh-aw"` \| `"claude-code"` | **reserved** — validated but not yet acted on; a future `init` will scaffold the agent body for the chosen substrate |
+| `site` | object, optional | read-only static site layer; absent ⇒ layer off |
+| `site.enabled` | boolean, required in block | master toggle for the `site` command |
+| `site.title` | string | the site's title; falls back to `GITHUB_REPOSITORY` when absent |
+| `site.description` | string | optional one-line description shown under the title |
 
 The sensor (like the workflow files themselves) is trusted code: anyone who
 can edit it controls what runs in CI. Review changes to it like workflow
