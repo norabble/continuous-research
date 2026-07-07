@@ -6,14 +6,30 @@ describe("scaffoldFiles", () => {
   const files = scaffoldFiles();
   const byPath = (p: string) => files.find((f) => f.path === p)?.content ?? "";
 
-  it("emits the config, both engine workflows, and both agent templates", () => {
+  it("emits the config, both engine workflows, the site workflow, and both agent templates", () => {
     expect(files.map((f) => f.path)).toEqual([
       ".research/config.json",
       ".github/workflows/sense.yml",
       ".github/workflows/decline.yml",
+      ".github/workflows/site.yml",
       ".github/workflows/interpretation.md",
       ".github/workflows/comment-resolution.md",
     ]);
+  });
+
+  it("scaffolds the site workflow", () => {
+    const site = byPath(".github/workflows/site.yml");
+    expect(site).toContain("actions/deploy-pages");
+    expect(site).toContain("npx --yes github:norabble/continuous-research#v0.1.5 site");
+    expect(site).toContain("pages: write");
+  });
+
+  it("config template carries a disabled site block", () => {
+    const config = JSON.parse(byPath(".research/config.json")) as unknown;
+    expect((config as { site: unknown }).site).toEqual({
+      enabled: false,
+      title: "TODO: your project title",
+    });
   });
 
   it("comment-resolution.md uses the slash-command trigger and sanitized text", () => {
@@ -41,7 +57,7 @@ describe("scaffoldFiles", () => {
     expect(sense).toContain("concurrency:");
     expect(sense).toContain("timeout-minutes:");
     // The engine ref is pinned — instances upgrade deliberately, not on HEAD.
-    expect(sense).toContain("npx --yes github:norabble/continuous-research#v0.1.3 sense");
+    expect(sense).toContain("npx --yes github:norabble/continuous-research#v0.1.5 sense");
     // The workflow's own token stays read-only; the App does the writes.
     expect(sense).toContain("contents: read");
   });
