@@ -6,6 +6,27 @@ Deferred items, none scheduled. Each entry says why it matters and what
 
 ## Live site / interpretation
 
+- **Blockquote rendering + entity-regression test (bundled)** — site-md's
+  `escapeHtml` escapes `>`, so findings blockquotes render as literal
+  "&gt;" text. Safe fix per the 2026-07-07 whole-branch review: drop `>`
+  from **site-md's source pre-escape only** (`<` still blocks all raw
+  HTML; `&` still defuses entity-obfuscated schemes) — never touch
+  site-render's `escapeText` (attribute sinks). Done = the change + a
+  regression test pinning `[x](javascript&colon;alert(1))` inert + the
+  blockquote test updated. Also note in-code: JS multiline `$` matches
+  before `\r`, so CRLF annotation-stripping works — don't "fix" it.
+- **Site cleanup ticket (small gaps, one pass)** — stable card sort
+  (proposedAt desc) + test; hostile-provenance detail-page test; export
+  ANNOTATION_LINE from site-md (dedupe with site-render); decline.yml pin
+  assertion in scaffold tests; README site row mentions dispatch; optional
+  `\r\n`→`\n` normalization atop renderUntrustedMarkdown; clear `_site/`
+  before local writes (stale updates/*.html across local previews).
+- **Go-public checklist additions (from the final review)** — before
+  flipping the sample public and enabling the site workflow: verify the
+  `github-pages` environment's deployment-branch protection accepts
+  deploys triggered from data-PR head branches (else every data-PR event
+  runs red), and check fork-PR behavior (secrets/OIDC unavailable).
+
 - **Impact declarations should lead with the revised claim** — the site's
   pending-update excerpt shows the impact markdown from the top, and the
   scaffolded interpretation template writes *prior claim first*, so the
