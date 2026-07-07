@@ -22,6 +22,18 @@ describe("scaffoldFiles", () => {
     expect(site).toContain("actions/deploy-pages");
     expect(site).toContain("npx --yes github:norabble/continuous-research#v0.1.5 site");
     expect(site).toContain("pages: write");
+    // A fresh scaffold ships site.enabled=false, so the engine writes no
+    // _site/ — the upload/deploy steps must be gated on the build having
+    // produced output, or every PR/push fails CI out of the box.
+    expect(site.match(/if: hashFiles\('_site\/\*\*'\) != ''/g)).toHaveLength(2);
+    // PR events matter only for data-PRs; push/dispatch always rebuild.
+    expect(site).toContain(
+      "github.event_name != 'pull_request' ||\n" +
+        "      contains(join(github.event.pull_request.labels.*.name, ','), 'data:')",
+    );
+    // Literal Actions expressions must survive (not TS interpolation).
+    expect(site).toContain("url: ${{ steps.deploy.outputs.page_url }}");
+    expect(site).toContain("GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}");
   });
 
   it("config template carries a disabled site block", () => {

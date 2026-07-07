@@ -124,6 +124,11 @@ concurrency:
 
 jobs:
   build-deploy:
+    # PR events matter only for data-PRs (the pending-updates section);
+    # pushes to main and manual dispatch always rebuild.
+    if: >-
+      github.event_name != 'pull_request' ||
+      contains(join(github.event.pull_request.labels.*.name, ','), 'data:')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment:
@@ -139,9 +144,13 @@ jobs:
           GITHUB_TOKEN: \${{ secrets.GITHUB_TOKEN }}
         run: npx --yes github:norabble/continuous-research#v0.1.5 site
       - uses: actions/upload-pages-artifact@v3
+        # Skipped when the site layer is disabled (the engine then writes no
+        # _site/) — the job stays green so a fresh scaffold never fails CI.
+        if: hashFiles('_site/**') != ''
         with:
           path: _site
       - id: deploy
+        if: hashFiles('_site/**') != ''
         uses: actions/deploy-pages@v4
 `;
 
