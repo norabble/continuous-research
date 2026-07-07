@@ -4,6 +4,22 @@ Deferred items, none scheduled. Each entry says why it matters and what
 "done" is — enough to pick it up cold. (Security items come from the
 2026-07-06 review of the release → distribution → execution process.)
 
+## Live site / interpretation
+
+- **Impact declarations should lead with the revised claim** — the site's
+  pending-update excerpt shows the impact markdown from the top, and the
+  scaffolded interpretation template writes *prior claim first*, so the
+  most useful line (the revised claim) is buried below the fold of any
+  excerpt (2026-07-06 prototype review). Done = the interpretation
+  workflow template's "Write" section orders the declaration revised-claim
+  → assessment → what-changed → prior-claim (or the renderer learns to
+  surface the revised-claim section first), and the sample's next edition
+  demonstrates it.
+- **Sample repo public flip** — security review of the sample's contents +
+  workflows first, then flip public, enable Pages, re-enable the `site`
+  workflow, and qualify the live event path (site rebuilds on data-PR
+  events). Blocked deliberately until the live-site task set is complete.
+
 ## Security hardening (release/distribution)
 
 - **Tag ruleset on `v*`** — tags are the trust anchor for `npx github:…#vX`
