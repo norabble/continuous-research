@@ -45,7 +45,7 @@ In the repo root (new or existing project — `init` never overwrites):
 npx --yes github:norabble/continuous-research#v0.1.5 init
 ```
 
-This scaffolds `.research/config.json` plus four workflows
+This scaffolds `.research/config.json` plus five workflows
 ([what each file is](./cli.md#init)). Then:
 
 1. **Wire your sensor.** Point `"sensor"` in `.research/config.json` at your

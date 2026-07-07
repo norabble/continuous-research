@@ -29,6 +29,7 @@ Scaffolds a Continuous Research instance into the current directory:
 | `.research/config.json` | the instance's hook declarations (see *Config*) |
 | `.github/workflows/sense.yml` | engine workflow: dispatch/cron → `sense` |
 | `.github/workflows/decline.yml` | engine workflow: PR closed-unmerged → `record-decline` |
+| `.github/workflows/site.yml` | engine workflow: data-PR events / findings pushes → `site` → GitHub Pages (gated: green while the site layer is disabled) |
 | `.github/workflows/interpretation.md` | gh-aw agentic workflow (compile with `gh aw compile`) |
 | `.github/workflows/comment-resolution.md` | gh-aw agentic workflow (`/resolve` slash command) |
 
