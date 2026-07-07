@@ -24,9 +24,12 @@ Decisions locked during brainstorming:
 - **Freshness**: rebuilt on repo events (minutes-stale worst case).
 - **Translation**: full — no PR numbers, diffs, or GitHub chrome; one
   "view on GitHub" link per update.
-- **Hosting**: GitHub Pages via Actions; qualify on the public sample
-  (`continuous-research-sample`). Private instances can build in CI but not
-  publish (Pages needs a paid plan on private repos).
+- **Hosting**: GitHub Pages via Actions. *(Revised 2026-07-06: the sample
+  turned out to be private — free-plan private repos cannot use Pages. The
+  sample stays private for now; v1 is qualified by building the site
+  locally/in CI without deploying, and the live Pages deploy happens when
+  the sample goes public, after a dedicated security review — maintainer
+  decision at the prototype gate.)*
 - **Architecture**: approach A — engine `site` subcommand + pure static
   renderer (chosen over client-side API fetch and third-party SSG for fit
   with the ports-and-adapters core, the existing distribution, and
@@ -36,20 +39,25 @@ Decisions locked during brainstorming:
 
 **Two page types, static HTML, no client-side JavaScript.**
 
-### Index page (top to bottom)
+### Index page (top to bottom) — order revised at the 2026-07-06 prototype review
 
 1. **Header** — instance title + one-line framing ("A living research
    project: findings update as new evidence arrives and passes review.")
    and a "last updated" date.
-2. **Pending updates** — one card per open data-PR: edition (descriptor),
-   proposed date, status "awaiting the author's review", the opening of its
-   impact assessment, link to the detail page. If the impact declaration
-   does not exist yet on the PR branch: evidence source + "assessment in
-   progress". Empty state: "No updates pending review — findings are
-   current as of \<date\>."
-3. **Current findings** — `findings.md` rendered to HTML. Claim annotations
-   are stripped during rendering (they are HTML comments — invisible
-   anyway). *(v2 seed: render per-claim status badges from annotations.)*
+2. **Current findings** — `findings.md` rendered to HTML, first: the
+   follower's primary question is "what does this claim now". Claim
+   annotations are stripped during rendering (they are HTML comments —
+   invisible anyway). *(v2 seed: per-claim status badges.)*
+3. **Pending updates** — one card per open data-PR: edition (descriptor),
+   proposed date, status "awaiting the author's review", an **excerpt of
+   its impact assessment rendered as markdown** (paragraph/line structure
+   preserved): the first **5 lines** of the impact source, followed by an
+   **active ellipsis** — a `<details>`/`<summary>` disclosure (HTML-native,
+   no JavaScript) whose summary is "…" and whose body is the remainder,
+   rendered. Content of ≤5 lines renders whole, no ellipsis. Plus a link
+   to the detail page. If the impact declaration does not exist yet on the
+   PR branch: evidence source + "assessment in progress". Empty state: "No
+   updates pending review — findings are current as of \<date\>."
 4. **Maintenance** (quiet, bottom) — one line per open framework-authored
    non-data PR, framed as instrument upkeep, each with a GitHub link.
 

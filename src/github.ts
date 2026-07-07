@@ -16,7 +16,7 @@
 import { Buffer } from "node:buffer";
 import type { Octokit } from "octokit";
 import type { Descriptor, PrState, PullRequest } from "./types";
-import type { GitHubPort, OpenPullRequestInput, PutFileInput } from "./ports";
+import type { GitHubPort, OpenPullRequest, OpenPullRequestInput, PutFileInput } from "./ports";
 import { provenancePathFor } from "./descriptor";
 
 /** The subset of an issues-list item the adapter reads. */
@@ -45,6 +45,30 @@ export function mapIssueToPullRequest(raw: RawIssue): PullRequest | null {
     number: raw.number,
     state: pullStateOf(raw.state, raw.pull_request.merged_at),
     labels: labelNamesOf(raw.labels),
+  };
+}
+
+/** The subset of a pulls-list item the adapter reads. */
+export interface RawPullRequest {
+  number: number;
+  title: string;
+  labels: RawIssue["labels"];
+  user?: { login?: string | null } | null;
+  created_at: string;
+  head: { ref: string };
+  html_url: string;
+}
+
+/** Map a pulls-list item to the site layer's {@link OpenPullRequest} shape. */
+export function mapPullRequestToOpenPullRequest(raw: RawPullRequest): OpenPullRequest {
+  return {
+    number: raw.number,
+    title: raw.title,
+    labels: labelNamesOf(raw.labels),
+    authorLogin: raw.user?.login ?? "",
+    createdAt: raw.created_at,
+    headRef: raw.head.ref,
+    htmlUrl: raw.html_url,
   };
 }
 
@@ -108,6 +132,16 @@ export class OctokitGitHubPort implements GitHubPort {
         }),
       )
       .filter((pr): pr is PullRequest => pr !== null);
+  }
+
+  async listOpenPullRequests(): Promise<OpenPullRequest[]> {
+    const { data } = await this.octokit.rest.pulls.list({
+      owner: this.owner,
+      repo: this.repo,
+      state: "open",
+      per_page: 100,
+    });
+    return data.map(mapPullRequestToOpenPullRequest);
   }
 
   async provenanceStubExists(descriptor: Descriptor): Promise<boolean> {

@@ -12,15 +12,17 @@ import type { ResearchConfig } from "./config";
 import type { SensorRunner } from "./sensor";
 import { parseDetectionResult } from "./sensor";
 import { dedupe } from "./dedup";
-import { buildProvenanceStub } from "./provenance";
+import { buildProvenanceStub, parseProvenanceStub } from "./provenance";
 import { proposeDataPR, recordDecline } from "./flows";
 import { scaffoldFiles } from "./scaffold";
-import { assertDescriptor } from "./descriptor";
+import { assertDescriptor, descriptorFromLabel, provenancePathFor } from "./descriptor";
 import type { ChangedKey } from "./results";
 import { diffResults, resolveResultsPath } from "./results";
 import { parseAnnotations, type ClaimIndex } from "./annotations";
 import { affectedClaims } from "./impact";
 import { lintConsistency, type LintFinding } from "./linter";
+import type { MaintenanceItem, PendingUpdate, SiteData, SiteFile } from "./site-render";
+import { renderSite } from "./site-render";
 
 export type SenseOutcome =
   | { action: "none"; reason: string }
@@ -160,4 +162,81 @@ export async function runImpact(deps: ImpactDeps): Promise<ImpactArtifact> {
     impact.linter === false ? [] : lintConsistency({ results: next, index, changed, priorIndex });
 
   return { edition: deps.descriptor, baseline, changed, affected, lint };
+}
+
+export interface SiteDeps {
+  config: ResearchConfig;
+  port: GitHubPort;
+  /** Injected so rendering stays deterministic (site-render.ts takes no clock). */
+  generatedAt: string;
+  /** Used when `config.site.title` is absent (CLI passes GITHUB_REPOSITORY). */
+  fallbackTitle: string;
+}
+
+/** First label that decodes to a data descriptor, or null (site's "is this a data-PR?" test). */
+function firstDataDescriptor(labels: string[]): Descriptor | null {
+  for (const label of labels) {
+    const descriptor = descriptorFromLabel(label);
+    if (descriptor !== null) return descriptor;
+  }
+  return null;
+}
+
+/**
+ * Gathers SiteData from open PRs per the trust + labeling rules and renders
+ * the site files; null when the site layer is off (the CLI logs and exits 0).
+ */
+export async function runSite(deps: SiteDeps): Promise<SiteFile[] | null> {
+  const site = deps.config.site;
+  if (!site?.enabled) return null;
+
+  const prs = await deps.port.listOpenPullRequests();
+  const updates: PendingUpdate[] = [];
+  const maintenance: MaintenanceItem[] = [];
+
+  for (const pr of prs) {
+    // Trust rule: only the engine's own bot PRs are surfaced, even when a
+    // human PR happens to carry a data label.
+    if (!pr.authorLogin.endsWith("[bot]")) continue;
+
+    const descriptor = firstDataDescriptor(pr.labels);
+    if (descriptor === null) {
+      maintenance.push({ title: pr.title, githubUrl: pr.htmlUrl });
+      continue;
+    }
+
+    const impactMd = await deps.port.readFileFromRef(
+      pr.headRef,
+      `.research/impact/${descriptor}.md`,
+    );
+    const provenanceRaw = await deps.port.readFileFromRef(
+      pr.headRef,
+      provenancePathFor(descriptor),
+    );
+    // Fail closed: an invalid provenance stub is a data-integrity problem,
+    // not something to paper over as "absent" — let the parse error propagate.
+    const provenance = provenanceRaw === null ? null : parseProvenanceStub(provenanceRaw);
+
+    updates.push({
+      descriptor,
+      proposedAt: pr.createdAt,
+      impactMd,
+      provenance,
+      githubUrl: pr.htmlUrl,
+    });
+  }
+
+  const defaultBranch = await deps.port.defaultBranch();
+  const findingsMd = await deps.port.readFileFromRef(defaultBranch, "findings.md");
+
+  const data: SiteData = {
+    title: site.title ?? deps.fallbackTitle,
+    description: site.description,
+    generatedAt: deps.generatedAt,
+    findingsMd,
+    updates,
+    maintenance,
+  };
+
+  return renderSite(data);
 }

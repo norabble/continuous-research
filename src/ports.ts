@@ -24,10 +24,22 @@ export interface OpenPullRequestInput {
   body: string;
 }
 
+export interface OpenPullRequest {
+  number: number;
+  title: string;
+  labels: string[];
+  authorLogin: string; // e.g. "continuous-research-bot[bot]"
+  createdAt: string; // ISO-8601
+  headRef: string; // branch name, e.g. "data/limits-google-d1992c4c"
+  htmlUrl: string;
+}
+
 export interface GitHubPort {
   // --- reads ---
   /** PRs carrying the given label, across open / merged / closed states. */
   listPullRequestsByLabel(label: string): Promise<PullRequest[]>;
+  /** All open PRs (any label/author); the site layer filters. */
+  listOpenPullRequests(): Promise<OpenPullRequest[]>;
   /** Whether this descriptor's provenance stub exists on the default branch. */
   provenanceStubExists(descriptor: Descriptor): Promise<boolean>;
   /**

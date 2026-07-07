@@ -19,11 +19,22 @@ export interface ImpactConfig {
   agentEngine?: AgentEngine;
 }
 
+export interface SiteConfig {
+  /** Master toggle for the site generation layer. */
+  enabled: boolean;
+  /** Optional title for the generated site. */
+  title?: string;
+  /** Optional description for the generated site. */
+  description?: string;
+}
+
 export interface ResearchConfig {
   /** Shell command the engine runs to detect new data (writes JSON to stdout). */
   sensor: string;
   /** Optional Phase-2 impact layer config; absent ⇒ layer off. */
   impact?: ImpactConfig;
+  /** Optional site generation config; absent ⇒ layer off. */
+  site?: SiteConfig;
 }
 
 function parseImpact(raw: unknown): ImpactConfig {
@@ -54,6 +65,23 @@ function parseImpact(raw: unknown): ImpactConfig {
   return out;
 }
 
+function parseSite(raw: unknown): SiteConfig {
+  if (typeof raw !== "object" || raw === null) throw new Error('config "site" must be an object');
+  const o = raw as Record<string, unknown>;
+  if (typeof o.enabled !== "boolean") throw new Error('config "site.enabled" must be a boolean');
+  const out: SiteConfig = { enabled: o.enabled };
+  if (o.title !== undefined) {
+    if (typeof o.title !== "string") throw new Error('config "site.title" must be a string');
+    out.title = o.title;
+  }
+  if (o.description !== undefined) {
+    if (typeof o.description !== "string")
+      throw new Error('config "site.description" must be a string');
+    out.description = o.description;
+  }
+  return out;
+}
+
 export function parseConfig(json: string): ResearchConfig {
   const data: unknown = JSON.parse(json);
   if (typeof data !== "object" || data === null) throw new Error("config must be a JSON object");
@@ -64,5 +92,6 @@ export function parseConfig(json: string): ResearchConfig {
   }
   const config: ResearchConfig = { sensor };
   if (obj.impact !== undefined) config.impact = parseImpact(obj.impact);
+  if (obj.site !== undefined) config.site = parseSite(obj.site);
   return config;
 }

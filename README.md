@@ -34,8 +34,9 @@ Both run inside **GitHub Actions workflows**, which provide the triggers:
 | `decline`            | PR closed-unmerged  | commit the decline record to `main`                       | engine | **built**   |
 | `interpretation`     | a new data-PR       | read the new data + claims → write the impact declaration | agent  | **built**   |
 | `comment-resolution` | `/resolve <request>` | address the reviewer's request on the data-PR branch     | agent  | **built**   |
+| `site`               | data-PR events / findings pushes | build the read-only site → GitHub Pages       | engine | **built**   |
 
-All four run in
+The first four run in
 [the sample instance](https://github.com/norabble/continuous-research-sample)
 — on 2026-07-02 a scheduled cycle sensed a real edition, opened the data-PR
 under the App identity, and the gh-aw interpretation agent wrote the impact

@@ -5,7 +5,9 @@ import {
   mapIssueToPullRequest,
   isNotFoundError,
   latestTrustedCommentBody,
+  mapPullRequestToOpenPullRequest,
   type RawIssue,
+  type RawPullRequest,
 } from "./github";
 
 describe("labelNamesOf", () => {
@@ -87,6 +89,35 @@ describe("latestTrustedCommentBody", () => {
         { body: "", author_association: "OWNER" },
       ]),
     ).toBe("real");
+  });
+});
+
+describe("mapPullRequestToOpenPullRequest", () => {
+  const prItem: RawPullRequest = {
+    number: 7,
+    title: "data: limits-google-d1992c4c",
+    labels: [{ name: "data:limits-google-d1992c4c" }],
+    user: { login: "continuous-research-bot[bot]" },
+    created_at: "2026-07-06T12:00:00Z",
+    head: { ref: "data/limits-google-d1992c4c" },
+    html_url: "https://github.com/o/r/pull/7",
+  };
+
+  it("maps a pulls-list item to the site layer's OpenPullRequest shape", () => {
+    expect(mapPullRequestToOpenPullRequest(prItem)).toEqual({
+      number: 7,
+      title: "data: limits-google-d1992c4c",
+      labels: ["data:limits-google-d1992c4c"],
+      authorLogin: "continuous-research-bot[bot]",
+      createdAt: "2026-07-06T12:00:00Z",
+      headRef: "data/limits-google-d1992c4c",
+      htmlUrl: "https://github.com/o/r/pull/7",
+    });
+  });
+
+  it("defaults authorLogin to empty string when user is null", () => {
+    const result = mapPullRequestToOpenPullRequest({ ...prItem, user: null });
+    expect(result.authorLogin).toBe("");
   });
 });
 
