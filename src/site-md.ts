@@ -52,8 +52,11 @@ const stripControlAndSpace = (s: string): string =>
  * authority), then check the first colon-terminated scheme (if any)
  * against an allowlist. No scheme at all means a relative reference, which
  * is safe by construction — it can't select "javascript" or change host.
+ *
+ * Shared with the site renderer for scheme-validating data-derived URLs
+ * in href attributes.
  */
-function isSafeHref(href: string): boolean {
+export function isSafeHref(href: string): boolean {
   const stripped = stripControlAndSpace(href.trim());
   const normalized = stripped.replace(/\\/g, "/");
   if (normalized.startsWith("//")) return false; // protocol-relative -> external host

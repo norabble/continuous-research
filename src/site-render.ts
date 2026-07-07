@@ -12,7 +12,7 @@
  */
 
 import type { ProvenanceStub } from "./provenance";
-import { renderUntrustedMarkdown } from "./site-md";
+import { isSafeHref, renderUntrustedMarkdown } from "./site-md";
 
 export interface PendingUpdate {
   descriptor: string;
@@ -71,6 +71,13 @@ function escapeText(s: string): string {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
+}
+
+// Scheme-validates a URL (protecting against javascript:, data:, vbscript:,
+// protocol-relative //, and other hostile schemes) and escapes it for safe
+// use in href attributes. Returns "#" for unsafe schemes.
+function safeHrefAttr(url: string): string {
+  return escapeText(isSafeHref(url) ? url : "#");
 }
 
 /** The date portion of an ISO-8601 timestamp, e.g. "2026-07-06T12:00:00Z" -> "2026-07-06". */
@@ -143,7 +150,7 @@ function renderFindingsSection(findingsMd: string | null): string {
 }
 
 function renderMaintenanceItem(item: MaintenanceItem): string {
-  return `<li>${escapeText(item.title)} — <a href="${escapeText(item.githubUrl)}">${COPY.githubLink}</a></li>`;
+  return `<li>${escapeText(item.title)} — <a href="${safeHrefAttr(item.githubUrl)}">${COPY.githubLink}</a></li>`;
 }
 
 function renderMaintenanceSection(maintenance: MaintenanceItem[]): string {

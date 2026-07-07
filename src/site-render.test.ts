@@ -66,6 +66,15 @@ describe("renderSite index", () => {
     expect(html).toContain(COPY.maintenanceHeading);
     expect(html).toContain('href="https://g/x"');
   });
+
+  it("scheme-validates maintenance item URLs, neutralizing javascript: to #", () => {
+    const html = index({
+      ...base,
+      maintenance: [{ title: "test item", githubUrl: "javascript:alert(1)" }],
+    });
+    expect(html).toContain('href="#"');
+    expect(html).not.toContain("javascript:");
+  });
   it("escapes hostile content arriving via markdown fields", () => {
     const html = index({ ...base, findingsMd: "<script>alert(1)</script>" });
     expect(html).not.toContain("<script>");
@@ -154,6 +163,7 @@ describe("renderSite index", () => {
       ],
     });
     expect(html).toContain("Short and sweet.");
+    expect(html).not.toMatch(/…/);
   });
 
   it("never emits a <script> tag anywhere in the index or stylesheet", () => {
