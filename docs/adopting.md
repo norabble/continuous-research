@@ -232,9 +232,11 @@ config schema, and exactly what it gathers:
    default branch that touch `findings.md` or `.research/`.
 
 **Private repos:** GitHub Pages requires a **public** repository on free
-plans. A private instance can still run the `site` build — it just skips
-the deploy steps, so the workflow stays green while producing no live
-page — or leave the workflow disabled until you're ready to publish.
+plans. On a private instance, **leave the `site` workflow disabled** (and
+`site.enabled` off) until you're ready to publish: with the site layer
+enabled, the build succeeds but the deploy step fails against the
+unavailable Pages site. You can still preview locally — run the
+[`site` command](./cli.md#site) from a clone and open `_site/index.html`.
 
 **Fail-closed:** a failed build never touches the deployed site — the
 previously published pages stay up until the next successful run.

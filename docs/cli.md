@@ -189,7 +189,7 @@ reading files by ref); the site build never writes to GitHub.
    becomes a **pending update** — its impact declaration
    (`.research/impact/<descriptor>.md`) and provenance stub are read from
    the PR's **head ref**, not the default branch (no impact declaration yet
-   ⇒ rendered as "assessment in progress"). One without a data label becomes
+   ⇒ rendered as "Assessment in progress"). One without a data label becomes
    a **maintenance** item.
 4. Read `findings.md` from the **default branch** for the current-findings
    section.
