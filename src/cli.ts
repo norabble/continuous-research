@@ -12,7 +12,7 @@ import { createRequire } from "node:module";
 import { dirname } from "node:path";
 import { parseConfig } from "./config";
 import { helpText } from "./help";
-import { runSense, runRecordDecline, runInit, runImpact } from "./commands";
+import { runSense, runRecordDecline, runInit, runImpact, runSite } from "./commands";
 import { NEXT_STEPS } from "./scaffold";
 import { execSensor, readArtifact, createGitHubPortFromEnv } from "./io";
 import { extractDeclineFromEvent } from "./event";
@@ -90,11 +90,34 @@ async function cmdImpact(): Promise<number> {
   return 0;
 }
 
+async function cmdSite(): Promise<number> {
+  const config = parseConfig(await readFile(".research/config.json", "utf8"));
+  const port = createGitHubPortFromEnv(process.env);
+  const files = await runSite({
+    config,
+    port,
+    generatedAt: new Date().toISOString(),
+    fallbackTitle: process.env.GITHUB_REPOSITORY ?? "research",
+  });
+  if (files === null) {
+    console.log("[site] disabled — nothing to do");
+    return 0;
+  }
+  for (const file of files) {
+    const path = `_site/${file.path}`;
+    await mkdir(dirname(path), { recursive: true });
+    await writeFile(path, file.content);
+  }
+  console.log(`[site] wrote ${files.length} files to _site/`);
+  return 0;
+}
+
 const COMMANDS: Record<string, () => Promise<number>> = {
   init: cmdInit,
   sense: cmdSense,
   "record-decline": cmdRecordDecline,
   impact: cmdImpact,
+  site: cmdSite,
 };
 
 /** Works from both src/ (tsx dev) and dist/ (built): ../package.json is the repo root. */

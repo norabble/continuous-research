@@ -12,6 +12,7 @@ export const CLI_COMMANDS: ReadonlyArray<{ name: string; summary: string }> = [
     name: "impact",
     summary: "diff results vs a prior edition; write the impact artifact (opt-in)",
   },
+  { name: "site", summary: "build the read-only static site into _site/" },
 ];
 
 export function helpText(version: string): string {
