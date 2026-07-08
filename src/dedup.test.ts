@@ -26,6 +26,11 @@ function portWith(overrides: Partial<GitHubPort>): GitHubPort {
     putFile: notImplemented("putFile"),
     openPullRequest: notImplemented("openPullRequest"),
     addLabels: notImplemented("addLabels"),
+    listOpenIssueNumbersByLabel: () => Promise.resolve([]),
+    ensureLabel: notImplemented("ensureLabel"),
+    createIssue: notImplemented("createIssue"),
+    commentOnIssue: notImplemented("commentOnIssue"),
+    lockIssue: notImplemented("lockIssue"),
     ...overrides,
   };
 }

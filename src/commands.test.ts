@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { runSense, runRecordDecline, runInit, runImpact, runSite } from "./commands";
-import type { GitHubPort, OpenPullRequest } from "./ports";
+import type { GitHubPort, OpenPullRequest, OpenPullRequestInput, PutFileInput } from "./ports";
+import type { Descriptor, PullRequest } from "./types";
 import { provenancePathFor } from "./descriptor";
 import { buildProvenanceStub, serializeProvenanceStub } from "./provenance";
 import { COPY } from "./site-render";
@@ -19,8 +20,82 @@ function portWith(overrides: Partial<GitHubPort>): GitHubPort {
     putFile: () => Promise.resolve(),
     openPullRequest: () => Promise.resolve(7),
     addLabels: () => Promise.resolve(),
+    listOpenIssueNumbersByLabel: () => Promise.resolve([]),
+    ensureLabel: () => Promise.resolve(),
+    createIssue: () => Promise.resolve(7),
+    commentOnIssue: () => Promise.resolve(),
+    lockIssue: () => Promise.resolve(),
     ...overrides,
   };
+}
+
+/**
+ * A recording GitHubPort for the issue-operations surface (drift escalation,
+ * consumed by the upcoming `escalateDrift` command). Every other member is
+ * inert, matching `portWith`'s defaults; these five record what was called
+ * so a test can assert against them.
+ */
+class FakeGitHubPort implements GitHubPort {
+  /** Settable: what listOpenIssueNumbersByLabel resolves to. */
+  openDriftIssues: number[] = [];
+  createdIssues: { title: string; body: string; labels: string[] }[] = [];
+  issueComments: { issueNumber: number; body: string }[] = [];
+  lockedIssues: number[] = [];
+  ensuredLabels: { name: string; description: string; color: string }[] = [];
+
+  listPullRequestsByLabel(_label: string): Promise<PullRequest[]> {
+    return Promise.resolve([]);
+  }
+  listOpenPullRequests(): Promise<OpenPullRequest[]> {
+    return Promise.resolve([]);
+  }
+  provenanceStubExists(_descriptor: Descriptor): Promise<boolean> {
+    return Promise.resolve(false);
+  }
+  latestTrustedComment(_prNumber: number): Promise<string | null> {
+    return Promise.resolve(null);
+  }
+  readFileFromRef(_ref: string, _path: string): Promise<string | null> {
+    return Promise.resolve(null);
+  }
+  defaultBranch(): Promise<string> {
+    return Promise.resolve("main");
+  }
+  branchHeadSha(_branch: string): Promise<string> {
+    return Promise.resolve("sha");
+  }
+  createBranch(_branch: string, _fromSha: string): Promise<void> {
+    return Promise.resolve();
+  }
+  putFile(_input: PutFileInput): Promise<void> {
+    return Promise.resolve();
+  }
+  openPullRequest(_input: OpenPullRequestInput): Promise<number> {
+    return Promise.resolve(7);
+  }
+  addLabels(_prNumber: number, _labels: string[]): Promise<void> {
+    return Promise.resolve();
+  }
+
+  listOpenIssueNumbersByLabel(_label: string): Promise<number[]> {
+    return Promise.resolve(this.openDriftIssues);
+  }
+  ensureLabel(name: string, description: string, color: string): Promise<void> {
+    this.ensuredLabels.push({ name, description, color });
+    return Promise.resolve();
+  }
+  createIssue(title: string, body: string, labels: string[]): Promise<number> {
+    this.createdIssues.push({ title, body, labels });
+    return Promise.resolve(42);
+  }
+  commentOnIssue(issueNumber: number, body: string): Promise<void> {
+    this.issueComments.push({ issueNumber, body });
+    return Promise.resolve();
+  }
+  lockIssue(issueNumber: number): Promise<void> {
+    this.lockedIssues.push(issueNumber);
+    return Promise.resolve();
+  }
 }
 
 const sensorOutput = JSON.stringify({
@@ -446,5 +521,30 @@ describe("runSite", () => {
       repoSlug: null,
     });
     expect(indexOf(withoutTitle)).toContain("o/r");
+  });
+});
+
+describe("FakeGitHubPort (recording fake for the issue-operations surface)", () => {
+  it("records createIssue/commentOnIssue/lockIssue and returns settable openDriftIssues", async () => {
+    const github = new FakeGitHubPort();
+    expect(await github.listOpenIssueNumbersByLabel("sensor-drift")).toEqual([]);
+
+    github.openDriftIssues = [17];
+    expect(await github.listOpenIssueNumbersByLabel("sensor-drift")).toEqual([17]);
+
+    const issueNumber = await github.createIssue("t", "b", ["sensor-drift"]);
+    expect(issueNumber).toBe(42);
+    expect(github.createdIssues).toEqual([{ title: "t", body: "b", labels: ["sensor-drift"] }]);
+
+    await github.commentOnIssue(17, "hello");
+    expect(github.issueComments).toEqual([{ issueNumber: 17, body: "hello" }]);
+
+    await github.lockIssue(17);
+    expect(github.lockedIssues).toEqual([17]);
+
+    await github.ensureLabel("sensor-drift", "desc", "B60205");
+    expect(github.ensuredLabels).toEqual([
+      { name: "sensor-drift", description: "desc", color: "B60205" },
+    ]);
   });
 });

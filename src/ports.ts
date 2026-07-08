@@ -61,4 +61,15 @@ export interface GitHubPort {
   /** Opens a PR and returns its number. */
   openPullRequest(input: OpenPullRequestInput): Promise<number>;
   addLabels(prNumber: number, labels: string[]): Promise<void>;
+
+  // --- issues (drift escalation) ---
+  /** Numbers of OPEN issues carrying the given label. */
+  listOpenIssueNumbersByLabel(label: string): Promise<number[]>;
+  /** Create-or-update the label (idempotent). */
+  ensureLabel(name: string, description: string, color: string): Promise<void>;
+  /** Opens an issue, returns its number. */
+  createIssue(title: string, body: string, labels: string[]): Promise<number>;
+  commentOnIssue(issueNumber: number, body: string): Promise<void>;
+  /** Locks the conversation; idempotent (REST lock returns 204 either way). */
+  lockIssue(issueNumber: number): Promise<void>;
 }
