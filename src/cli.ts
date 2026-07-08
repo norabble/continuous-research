@@ -98,6 +98,7 @@ async function cmdSite(): Promise<number> {
     port,
     generatedAt: new Date().toISOString(),
     fallbackTitle: process.env.GITHUB_REPOSITORY ?? "research",
+    repoSlug: process.env.GITHUB_REPOSITORY ?? null,
   });
   if (files === null) {
     console.log("[site] disabled — nothing to do");

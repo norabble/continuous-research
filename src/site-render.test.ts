@@ -7,6 +7,7 @@ const base: SiteData = {
   findingsMd: "# Findings\n\nPrice is above its 7-day average.",
   updates: [],
   maintenance: [],
+  repoSlug: null,
 };
 const index = (d: SiteData) => renderSite(d).find((f) => f.path === "index.html")!.content;
 
@@ -57,6 +58,17 @@ describe("renderSite index", () => {
   it("renders findings and omits the section when absent", () => {
     expect(index(base)).toContain("7-day average");
     expect(index({ ...base, findingsMd: null })).not.toContain(COPY.findingsHeading);
+  });
+  it("rewrites relative findings links against the repo", () => {
+    const files = renderSite({
+      ...base,
+      repoSlug: "norabble/continuous-research-sample",
+      findingsMd: "[the sensor](./sensor.mjs)",
+    });
+    const index = files.find((f) => f.path === "index.html")!;
+    expect(index.content).toContain(
+      'href="https://github.com/norabble/continuous-research-sample/blob/HEAD/sensor.mjs"',
+    );
   });
   it("lists maintenance quietly with a GitHub link", () => {
     const html = index({

@@ -171,6 +171,8 @@ export interface SiteDeps {
   generatedAt: string;
   /** Used when `config.site.title` is absent (CLI passes GITHUB_REPOSITORY). */
   fallbackTitle: string;
+  /** "owner/repo", or null; threaded into SiteData for link rewriting (CLI passes GITHUB_REPOSITORY). */
+  repoSlug: string | null;
 }
 
 /** First label that decodes to a data descriptor, or null (site's "is this a data-PR?" test). */
@@ -236,6 +238,7 @@ export async function runSite(deps: SiteDeps): Promise<SiteFile[] | null> {
     findingsMd,
     updates,
     maintenance,
+    repoSlug: deps.repoSlug,
   };
 
   return renderSite(data);

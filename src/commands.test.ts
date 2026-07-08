@@ -259,6 +259,7 @@ describe("runSite", () => {
         port: portWith({}),
         generatedAt: T,
         fallbackTitle: "o/r",
+        repoSlug: null,
       }),
     ).toBeNull();
   });
@@ -270,6 +271,7 @@ describe("runSite", () => {
         port: portWith({}),
         generatedAt: T,
         fallbackTitle: "o/r",
+        repoSlug: null,
       }),
     ).toBeNull();
   });
@@ -289,6 +291,7 @@ describe("runSite", () => {
       }),
       generatedAt: T,
       fallbackTitle: "o/r",
+      repoSlug: null,
     });
     expect(files).not.toBeNull();
     const index = indexOf(files);
@@ -331,6 +334,7 @@ describe("runSite", () => {
       }),
       generatedAt: T,
       fallbackTitle: "o/r",
+      repoSlug: null,
     });
     expect(files).not.toBeNull();
     const index = indexOf(files);
@@ -364,6 +368,7 @@ describe("runSite", () => {
       }),
       generatedAt: T,
       fallbackTitle: "o/r",
+      repoSlug: null,
     });
     expect(files).not.toBeNull();
     const index = indexOf(files);
@@ -390,6 +395,7 @@ describe("runSite", () => {
       }),
       generatedAt: T,
       fallbackTitle: "o/r",
+      repoSlug: null,
     });
     expect(files).not.toBeNull();
     const index = indexOf(files);
@@ -417,6 +423,7 @@ describe("runSite", () => {
         }),
         generatedAt: T,
         fallbackTitle: "o/r",
+        repoSlug: null,
       }),
     ).rejects.toThrow();
   });
@@ -427,6 +434,7 @@ describe("runSite", () => {
       port: portWith({}),
       generatedAt: T,
       fallbackTitle: "o/r",
+      repoSlug: null,
     });
     expect(indexOf(withTitle)).toContain("BTC-USD, continuously");
 
@@ -435,6 +443,7 @@ describe("runSite", () => {
       port: portWith({}),
       generatedAt: T,
       fallbackTitle: "o/r",
+      repoSlug: null,
     });
     expect(indexOf(withoutTitle)).toContain("o/r");
   });
