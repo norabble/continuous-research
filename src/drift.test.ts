@@ -18,6 +18,12 @@ describe("planDriftEscalation", () => {
     expect(plan.issueNumber).toBe(17);
   });
 
+  it("picks the oldest (lowest-numbered) issue regardless of input order", () => {
+    const plan = planDriftEscalation(report, [23, 17]);
+    expect(plan.action).toBe("comment");
+    expect(plan.issueNumber).toBe(17);
+  });
+
   it("rejects a report that is not a JSON object", () => {
     expect(() => planDriftEscalation("[]", [])).toThrow(TypeError);
     expect(() => planDriftEscalation("not json", [])).toThrow();

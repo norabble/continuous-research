@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { runSense, runRecordDecline, runInit, runImpact, runSite } from "./commands";
+import { runSense, runRecordDecline, runInit, runImpact, runSite, escalateDrift } from "./commands";
 import type { GitHubPort, OpenPullRequest, OpenPullRequestInput, PutFileInput } from "./ports";
 import type { Descriptor, PullRequest } from "./types";
 import { provenancePathFor } from "./descriptor";
@@ -546,5 +546,45 @@ describe("FakeGitHubPort (recording fake for the issue-operations surface)", () 
     expect(github.ensuredLabels).toEqual([
       { name: "sensor-drift", description: "desc", color: "B60205" },
     ]);
+  });
+});
+
+describe("escalateDrift", () => {
+  const report = JSON.stringify({ reason: "fetch-failed", detail: "x" });
+
+  it("no-ops without a report", async () => {
+    const github = new FakeGitHubPort();
+    const out = await escalateDrift({
+      github,
+      readReport: () => Promise.resolve(null),
+      log: () => {},
+    });
+    expect(out).toEqual({ outcome: "no-drift" });
+    expect(github.createdIssues).toHaveLength(0);
+  });
+
+  it("creates, labels, and locks the first drift issue", async () => {
+    const github = new FakeGitHubPort(); // fake returns e.g. number 42 on create
+    const out = await escalateDrift({
+      github,
+      readReport: () => Promise.resolve(report),
+      log: () => {},
+    });
+    expect(out).toEqual({ outcome: "created", issueNumber: 42 });
+    expect(github.createdIssues[0]!.labels).toContain("sensor-drift");
+    expect(github.lockedIssues).toContain(42);
+  });
+
+  it("comments on and re-locks an existing open drift issue", async () => {
+    const github = new FakeGitHubPort();
+    github.openDriftIssues = [17];
+    const out = await escalateDrift({
+      github,
+      readReport: () => Promise.resolve(report),
+      log: () => {},
+    });
+    expect(out).toEqual({ outcome: "commented", issueNumber: 17 });
+    expect(github.issueComments[0]!.issueNumber).toBe(17);
+    expect(github.lockedIssues).toContain(17);
   });
 });

@@ -20,6 +20,7 @@ describe("helpText", () => {
       "record-decline",
       "impact",
       "site",
+      "escalate-drift",
     ]);
   });
 

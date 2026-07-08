@@ -23,6 +23,12 @@ import { affectedClaims } from "./impact";
 import { lintConsistency, type LintFinding } from "./linter";
 import type { MaintenanceItem, PendingUpdate, SiteData, SiteFile } from "./site-render";
 import { renderSite } from "./site-render";
+import {
+  DRIFT_LABEL,
+  DRIFT_LABEL_COLOR,
+  DRIFT_LABEL_DESCRIPTION,
+  planDriftEscalation,
+} from "./drift";
 
 export type SenseOutcome =
   | { action: "none"; reason: string }
@@ -242,4 +248,47 @@ export async function runSite(deps: SiteDeps): Promise<SiteFile[] | null> {
   };
 
   return renderSite(data);
+}
+
+export interface EscalateDriftDeps {
+  github: GitHubPort;
+  /** UTF-8 report content, or null when no report exists (the no-drift case). */
+  readReport: () => Promise<string | null>;
+  log: (message: string) => void;
+}
+
+export type EscalateDriftOutcome =
+  | { outcome: "no-drift" }
+  | { outcome: "created"; issueNumber: number }
+  | { outcome: "commented"; issueNumber: number };
+
+/**
+ * Files or refreshes the single open sensor-drift issue from a drift report.
+ * A normal sense run has no report — that's the no-drift case, not an error.
+ * The touched issue is always re-locked (create and comment paths both): the
+ * issue is agent-consumed instructions, so an open thread on a public repo
+ * would be a prompt-injection channel.
+ */
+export async function escalateDrift(deps: EscalateDriftDeps): Promise<EscalateDriftOutcome> {
+  const report = await deps.readReport();
+  if (report === null) {
+    deps.log("escalate-drift: no drift report — nothing to do");
+    return { outcome: "no-drift" };
+  }
+  await deps.github.ensureLabel(DRIFT_LABEL, DRIFT_LABEL_DESCRIPTION, DRIFT_LABEL_COLOR);
+  const open = await deps.github.listOpenIssueNumbersByLabel(DRIFT_LABEL);
+  const plan = planDriftEscalation(report, open);
+  let issueNumber: number;
+  if (plan.action === "create") {
+    issueNumber = await deps.github.createIssue(plan.title, plan.body, [DRIFT_LABEL]);
+    deps.log(`escalate-drift: opened issue #${issueNumber}`);
+  } else {
+    issueNumber = plan.issueNumber as number;
+    await deps.github.commentOnIssue(issueNumber, plan.body);
+    deps.log(`escalate-drift: commented on open issue #${issueNumber}`);
+  }
+  await deps.github.lockIssue(issueNumber);
+  return plan.action === "create"
+    ? { outcome: "created", issueNumber }
+    : { outcome: "commented", issueNumber };
 }

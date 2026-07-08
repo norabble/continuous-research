@@ -13,6 +13,10 @@ export const CLI_COMMANDS: ReadonlyArray<{ name: string; summary: string }> = [
     summary: "diff results vs a prior edition; write the impact artifact (opt-in)",
   },
   { name: "site", summary: "build the read-only static site into _site/" },
+  {
+    name: "escalate-drift",
+    summary: "file/refresh the locked sensor-drift issue from .research/drift/report.json",
+  },
 ];
 
 export function helpText(version: string): string {
