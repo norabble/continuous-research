@@ -20,7 +20,9 @@
  *     `mailto:`, or schemeless (relative/fragment) references. Everything
  *     else — `javascript:`, `data:`, `vbscript:`, protocol-relative
  *     `//host`, and the backslash-as-slash authority trick browsers apply
- *     when resolving http(s) URLs — is neutralized to `#`.
+ *     when resolving http(s) URLs — is neutralized to `#`. Relative
+ *     destinations are optionally rewritten to GitHub blob/raw URLs because
+ *     site pages are served off-repo.
  */
 
 import { Marked, type Token, type Tokens } from "marked";
@@ -64,18 +66,67 @@ export function isSafeHref(href: string): boolean {
   return scheme ? SAFE_SCHEMES.has(scheme.toLowerCase()) : true;
 }
 
+export interface RenderOptions {
+  /**
+   * "owner/repo". When set, relative link/image destinations are rewritten
+   * to GitHub blob/raw URLs — site pages are served off-repo (Pages), so a
+   * repo-relative href would 404 there. GitHub remains the canonical host
+   * for repo files.
+   */
+  repoSlug?: string;
+  /** Repo-relative directory the markdown source lives in ("" = root). */
+  sourceDir?: string;
+}
+
+const HAS_SCHEME = /^[a-z][a-z0-9+.-]*:/i;
+
+/** Pure ./ and ../ resolution against the repo root; null = escapes root. */
+const resolveRepoPath = (sourceDir: string, ref: string): string | null => {
+  const joined = ref.startsWith("/") ? ref.slice(1) : `${sourceDir}/${ref}`;
+  const out: string[] = [];
+  for (const seg of joined.split("/")) {
+    if (seg === "" || seg === ".") continue;
+    if (seg === "..") {
+      if (out.length === 0) return null;
+      out.pop();
+    } else {
+      out.push(seg);
+    }
+  }
+  return out.length === 0 ? null : out.join("/");
+};
+
+const rewriteRelativeHref = (href: string, view: "blob" | "raw", opts: RenderOptions): string => {
+  const trimmed = href.trim();
+  // Only schemeless, non-protocol-relative refs are candidates; isSafeHref
+  // has already run, so anything else is absolute (kept) or neutralized.
+  if (HAS_SCHEME.test(trimmed) || trimmed.startsWith("//")) return href;
+  const hash = trimmed.indexOf("#");
+  const path = hash === -1 ? trimmed : trimmed.slice(0, hash);
+  const fragment = hash === -1 ? "" : trimmed.slice(hash);
+  if (path === "") return href; // same-page anchor
+  const resolved = resolveRepoPath(opts.sourceDir ?? "", path);
+  if (resolved === null) return href;
+  return `https://github.com/${opts.repoSlug}/${view}/HEAD/${resolved}${fragment}`;
+};
+
 function isLinkOrImageToken(token: Token): token is Tokens.Link | Tokens.Image {
   return token.type === "link" || token.type === "image";
 }
 
-export function renderUntrustedMarkdown(md: string): string {
+export function renderUntrustedMarkdown(md: string, opts: RenderOptions = {}): string {
   const withoutAnnotations = md.replace(ANNOTATION_LINE, "");
   const source = escapeHtml(withoutAnnotations);
   const marked = new Marked({
     async: false,
     walkTokens: (token) => {
-      if (isLinkOrImageToken(token) && !isSafeHref(token.href)) {
+      if (!isLinkOrImageToken(token)) return;
+      if (!isSafeHref(token.href)) {
         token.href = "#";
+        return;
+      }
+      if (opts.repoSlug) {
+        token.href = rewriteRelativeHref(token.href, token.type === "image" ? "raw" : "blob", opts);
       }
     },
   });

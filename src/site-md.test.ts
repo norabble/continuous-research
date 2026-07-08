@@ -105,3 +105,70 @@ describe("renderUntrustedMarkdown", () => {
     expect(html).toContain('&lt;<a href="https://e.com">https://e.com</a>&gt;');
   });
 });
+
+describe("relative link rewriting", () => {
+  const opts = { repoSlug: "norabble/continuous-research-sample" };
+
+  it("rewrites a root-relative link to blob/HEAD", () => {
+    const html = renderUntrustedMarkdown("[readme](./README.md)", opts);
+    expect(html).toContain(
+      'href="https://github.com/norabble/continuous-research-sample/blob/HEAD/README.md"',
+    );
+  });
+
+  it("rewrites an image to raw/HEAD", () => {
+    const html = renderUntrustedMarkdown("![chart](plots/chart.png)", opts);
+    expect(html).toContain(
+      'src="https://github.com/norabble/continuous-research-sample/raw/HEAD/plots/chart.png"',
+    );
+  });
+
+  it("resolves the source directory and parent traversal", () => {
+    const html = renderUntrustedMarkdown("[data](../../data/x.json)", {
+      ...opts,
+      sourceDir: ".research/impact",
+    });
+    expect(html).toContain(
+      'href="https://github.com/norabble/continuous-research-sample/blob/HEAD/data/x.json"',
+    );
+  });
+
+  it("leaves traversal above the repo root unrewritten", () => {
+    const html = renderUntrustedMarkdown("[up](../escape.md)", opts);
+    expect(html).toContain('href="../escape.md"');
+  });
+
+  it("treats a leading slash as repo-root", () => {
+    const html = renderUntrustedMarkdown("[s](/sensor.mjs)", {
+      ...opts,
+      sourceDir: ".research/impact",
+    });
+    expect(html).toContain(
+      'href="https://github.com/norabble/continuous-research-sample/blob/HEAD/sensor.mjs"',
+    );
+  });
+
+  it("preserves fragments and skips pure-fragment anchors", () => {
+    expect(renderUntrustedMarkdown("[a](docs/x.md#part)", opts)).toContain(
+      'href="https://github.com/norabble/continuous-research-sample/blob/HEAD/docs/x.md#part"',
+    );
+    expect(renderUntrustedMarkdown("[a](#local)", opts)).toContain('href="#local"');
+  });
+
+  it("leaves absolute http(s) and mailto untouched", () => {
+    expect(renderUntrustedMarkdown("[x](https://example.com/a)", opts)).toContain(
+      'href="https://example.com/a"',
+    );
+    expect(renderUntrustedMarkdown("[m](mailto:a@b.c)", opts)).toContain('href="mailto:a@b.c"');
+  });
+
+  it("still neutralizes unsafe schemes to #, never rewrites them", () => {
+    const html = renderUntrustedMarkdown("[x](javascript:alert(1))", opts);
+    expect(html).toContain('href="#"');
+  });
+
+  it("does not rewrite when repoSlug is absent (back-compat)", () => {
+    const html = renderUntrustedMarkdown("[readme](./README.md)");
+    expect(html).toContain('href="./README.md"');
+  });
+});
