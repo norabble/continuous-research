@@ -11,11 +11,11 @@ edition, data-PR, provenance stub, decline record) is defined in
 
 | Context | Command |
 | --- | --- |
-| An instance's CI (the normal path) | `npx --yes github:norabble/continuous-research#v0.1.5 <command>` |
+| An instance's CI (the normal path) | `npx --yes github:norabble/continuous-research#v0.1.6 <command>` |
 | Framework development | `npm run cli -- <command>` |
 | No-npx fallback | vendor the bundle (`npm run build:bundle` → `bundle/continuous-research.mjs`) into the instance repo and `node engine/continuous-research.mjs <command>` |
 
-Pin a tag (`#v0.1.5`), never a branch — the scaffold does this for you.
+Pin a tag (`#v0.1.6`), never a branch — the scaffold does this for you.
 `--version` prints the resolved version; `--help` summarizes this page.
 
 ## Commands

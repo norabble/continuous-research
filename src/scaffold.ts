@@ -72,14 +72,14 @@ jobs:
         # If the framework is not reachable via npx in your setup, vendor the
         # engine bundle into the repo and use:
         #   run: node engine/continuous-research.mjs sense
-        run: npx --yes github:norabble/continuous-research#v0.1.5 sense
+        run: npx --yes github:norabble/continuous-research#v0.1.6 sense
       - name: Escalate drift
         # If the sensor wrote .research/drift/report.json (working-tree
         # only), file/refresh the single LOCKED sensor-drift issue the
         # repair workflow consumes. No report -> no-op.
         env:
           GITHUB_TOKEN: \${{ steps.app-token.outputs.token }}
-        run: npx --yes github:norabble/continuous-research#v0.1.5 escalate-drift
+        run: npx --yes github:norabble/continuous-research#v0.1.6 escalate-drift
 `;
 
 const DECLINE_WORKFLOW = `name: decline
@@ -121,7 +121,7 @@ jobs:
       - name: record-decline
         env:
           GITHUB_TOKEN: \${{ steps.app-token.outputs.token }}
-        run: npx --yes github:norabble/continuous-research#v0.1.5 record-decline
+        run: npx --yes github:norabble/continuous-research#v0.1.6 record-decline
 `;
 
 const SITE_WORKFLOW = `name: site
@@ -166,11 +166,12 @@ jobs:
       - name: build
         env:
           GITHUB_TOKEN: \${{ secrets.GITHUB_TOKEN }}
-        run: npx --yes github:norabble/continuous-research#v0.1.5 site
+        run: npx --yes github:norabble/continuous-research#v0.1.6 site
       # Inlined the official Pages-upload composite action: it calls
       # actions/upload-artifact by tag internally, which repos enforcing
       # required SHA pinning reject (the policy applies to nested
-      # references). These two steps are exactly what that composite does.
+      # references). These two steps are what that composite does, minus its .git/.github/
+      # dotfile excludes — _site/ is generator output, so there is nothing to exclude.
       - name: Package site for Pages
         if: hashFiles('_site/**') != ''
         run: tar --dereference --hard-dereference -cvf "$RUNNER_TEMP/artifact.tar" -C _site .

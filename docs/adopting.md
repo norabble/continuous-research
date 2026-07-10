@@ -42,7 +42,7 @@ Merge authority stays with you. Agents only ever propose.
 In the repo root (new or existing project — `init` never overwrites):
 
 ```sh
-npx --yes github:norabble/continuous-research#v0.1.5 init
+npx --yes github:norabble/continuous-research#v0.1.6 init
 ```
 
 This scaffolds `.research/config.json` plus five workflows
@@ -184,7 +184,7 @@ for qualifying a sensor before the App is wired:
 
 ```sh
 GITHUB_TOKEN=$(gh auth token) GITHUB_REPOSITORY=<owner>/<repo> \
-  npx --yes github:norabble/continuous-research#v0.1.5 sense
+  npx --yes github:norabble/continuous-research#v0.1.6 sense
 ```
 
 Know what changes in this mode:
@@ -305,7 +305,7 @@ Instances pin the engine by tag, so nothing changes until you move the pin:
    runs end-to-end.
 
 **Hardened mode — pin the engine to a commit, not a tag.** The scaffold pins
-the engine by tag (`#v0.1.5`), and a tag is mutable: whoever can move it runs
+the engine by tag (`#v0.1.6`), and a tag is mutable: whoever can move it runs
 on your next cron with your App token. Pinning to a full commit SHA instead —
 `github:norabble/continuous-research#<full-sha>` — removes that trust in the
 tag entirely. The trade-off is that upgrades become manual SHA bumps with no

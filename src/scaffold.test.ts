@@ -22,7 +22,7 @@ describe("scaffoldFiles", () => {
   it("scaffolds the site workflow", () => {
     const site = byPath(".github/workflows/site.yml");
     expect(site).toContain("actions/deploy-pages");
-    expect(site).toContain("npx --yes github:norabble/continuous-research#v0.1.5 site");
+    expect(site).toContain("npx --yes github:norabble/continuous-research#v0.1.6 site");
     expect(site).toContain("pages: write");
     // A fresh scaffold ships site.enabled=false, so the engine writes no
     // _site/ — the package/upload/deploy steps must all be gated on the
@@ -73,7 +73,7 @@ describe("scaffoldFiles", () => {
     expect(sense).toContain("concurrency:");
     expect(sense).toContain("timeout-minutes:");
     // The engine ref is pinned — instances upgrade deliberately, not on HEAD.
-    expect(sense).toContain("npx --yes github:norabble/continuous-research#v0.1.5 sense");
+    expect(sense).toContain("npx --yes github:norabble/continuous-research#v0.1.6 sense");
     // The workflow's own token stays read-only; the App does the writes.
     expect(sense).toContain("contents: read");
   });
