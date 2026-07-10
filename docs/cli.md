@@ -116,6 +116,41 @@ untrusted comments are never quoted into the record), falling back to
 > record falls back to the default text. Make your org membership public if
 > you want closing comments captured on org-owned instances.
 
+### `escalate-drift`
+
+Runs from the `sense.yml` workflow's *Escalate drift* step, right after
+`sense`. Turns a **drift report** the sensor left in the working tree into the
+single open **sensor-drift issue** a repair workflow consumes. Deterministic
+templating; no agent, no inference.
+
+**Environment (required):** `GITHUB_TOKEN`/`GH_TOKEN` and `GITHUB_REPOSITORY`
+as for `sense`, but the token must carry **Issues: read and write** (the App
+token already does — the scaffold's `sense.yml` mints one token for both
+steps).
+
+**Behavior, in order:**
+
+1. Read the drift report from `.research/drift/report.json` (see *Sensor
+   contract*). **Absent ⇒ exit 0**, no GitHub call — the normal case, since a
+   healthy sense run leaves no report.
+2. Ensure the `sensor-drift` label exists, then list the open issues that
+   carry it. **One open sensor-drift issue is the dedup unit:** none open ⇒
+   create it (embedding the report as a fenced JSON block); one already open
+   ⇒ comment on it instead of re-filing.
+3. **Lock the issue** — on both paths, every run. It is agent-consumed
+   instructions (a repair workflow reads it), so an open thread on a public
+   repo would be a prompt-injection channel; locking keeps its content
+   maintainer- and sensor-authored only.
+
+One line is logged: `escalate-drift: no drift report — nothing to do`,
+`escalate-drift: opened issue #N`, or `escalate-drift: commented on open
+issue #N`.
+
+A report that is valid JSON but **not an object** (an array, string, or
+number) fails the run (exit 1) before any issue is touched — the report is
+sensor-authored, and a broken one should fail loudly rather than file a
+garbage issue.
+
 ### `impact` — _preview (since `v0.1.3`; opt-in)_
 
 The deterministic half of the Phase-2 **mechanical impact layer**
@@ -285,6 +320,16 @@ Contract notes:
 - stdout must contain only the JSON object; log to stderr.
 - A non-zero sensor exit or unparseable stdout fails the run (exit 1) —
   fail-closed, nothing is proposed.
+
+**Drift reports.** A sensor that cannot produce an edition — its declared
+source moved, or the fetch broke — should still exit 0 emitting `{ "changed":
+false }`, and additionally write a **drift report** to
+`.research/drift/report.json` (working tree only — never committed). The
+report is any **JSON object**; `reason` and `detail` are the recommended
+fields, plus anything the sensor wants embedded — it is echoed verbatim into
+the sensor-drift issue. The follow-on [`escalate-drift`](#escalate-drift) step
+turns the report into that issue; with no report it is a no-op, so a sensor
+that never drifts need not know the mechanism exists.
 
 ## What the engine writes
 
