@@ -41,6 +41,9 @@ export interface SiteData {
   findingsMd: string | null; // null => section omitted
   updates: PendingUpdate[];
   maintenance: MaintenanceItem[];
+  // "owner/repo", or null to leave relative markdown links/images untouched
+  // (see renderUntrustedMarkdown's repoSlug option, src/site-md.ts).
+  repoSlug: string | null;
 }
 
 export interface SiteFile {
@@ -109,6 +112,15 @@ const ANNOTATION_LINE = /^[ \t]*<!--\s*claim:[\s\S]*?-->[ \t]*$/gm;
 
 const EXCERPT_LINES = 5;
 
+// Renders untrusted markdown with the site's repoSlug (if any) threaded
+// through, so relative link/image destinations resolve against GitHub
+// instead of the Pages origin. `sourceDir` is the repo-relative directory
+// the source markdown lives in (see RenderOptions, src/site-md.ts) — "" for
+// findings.md (repo root), ".research/impact" for impact bodies/excerpts.
+function renderMd(src: string, repoSlug: string | null, sourceDir: string): string {
+  return renderUntrustedMarkdown(src, repoSlug ? { repoSlug, sourceDir } : {});
+}
+
 /** Splits annotation-stripped markdown source into a head (first N lines) and an optional remainder. */
 function splitImpactSource(md: string): { headMd: string; restMd: string | null } {
   const stripped = md.replace(ANNOTATION_LINE, "");
@@ -126,17 +138,17 @@ function splitImpactSource(md: string): { headMd: string; restMd: string | null 
 // markdown construct that happens to straddle the line-5 boundary (e.g. a
 // list) may render as two fragments; acceptable per spec (deterministic
 // line-splitting beats clever segmentation).
-function renderImpactExcerpt(md: string): string {
+function renderImpactExcerpt(md: string, repoSlug: string | null): string {
   const { headMd, restMd } = splitImpactSource(md);
-  const head = renderUntrustedMarkdown(headMd);
+  const head = renderMd(headMd, repoSlug, ".research/impact");
   if (restMd === null) return head;
   const hint = escapeText(COPY.expandHint);
-  return `${head}<details class="impact-more"><summary aria-label="${hint}" title="${hint}">…</summary>${renderUntrustedMarkdown(restMd)}</details>`;
+  return `${head}<details class="impact-more"><summary aria-label="${hint}" title="${hint}">…</summary>${renderMd(restMd, repoSlug, ".research/impact")}</details>`;
 }
 
-function renderUpdateCard(update: PendingUpdate): string {
+function renderUpdateCard(update: PendingUpdate, repoSlug: string | null): string {
   const body = update.impactMd
-    ? renderImpactExcerpt(update.impactMd)
+    ? renderImpactExcerpt(update.impactMd, repoSlug)
     : `<p>${COPY.assessmentPending}</p>`;
   const descriptor = escapeText(update.descriptor);
   return `
@@ -148,11 +160,11 @@ function renderUpdateCard(update: PendingUpdate): string {
     </article>`;
 }
 
-function renderPendingSection(updates: PendingUpdate[]): string {
+function renderPendingSection(updates: PendingUpdate[], repoSlug: string | null): string {
   const body =
     updates.length === 0
       ? `<p class="empty">${COPY.pendingEmpty}</p>`
-      : `<div class="cards">${updates.map(renderUpdateCard).join("")}</div>`;
+      : `<div class="cards">${updates.map((update) => renderUpdateCard(update, repoSlug)).join("")}</div>`;
   return `
   <section class="pending">
     <h2>${COPY.pendingHeading}</h2>
@@ -161,12 +173,12 @@ function renderPendingSection(updates: PendingUpdate[]): string {
   </section>`;
 }
 
-function renderFindingsSection(findingsMd: string | null): string {
+function renderFindingsSection(findingsMd: string | null, repoSlug: string | null): string {
   if (findingsMd === null) return "";
   return `
   <section class="findings">
     <h2>${COPY.findingsHeading}</h2>
-    ${renderUntrustedMarkdown(findingsMd)}
+    ${renderMd(findingsMd, repoSlug, "")}
   </section>`;
 }
 
@@ -212,7 +224,7 @@ function renderIndex(data: SiteData): string {
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <main>${renderHeader(data)}${renderFindingsSection(data.findingsMd)}${renderPendingSection(data.updates)}${renderMaintenanceSection(data.maintenance)}
+  <main>${renderHeader(data)}${renderFindingsSection(data.findingsMd, data.repoSlug)}${renderPendingSection(data.updates, data.repoSlug)}${renderMaintenanceSection(data.maintenance)}
   </main>
 </body>
 </html>
@@ -235,8 +247,10 @@ function renderProvenanceSection(provenance: ProvenanceStub | null): string {
     </section>`;
 }
 
-function renderImpactSection(impactMd: string | null): string {
-  const body = impactMd ? renderUntrustedMarkdown(impactMd) : `<p>${COPY.assessmentPending}</p>`;
+function renderImpactSection(impactMd: string | null, repoSlug: string | null): string {
+  const body = impactMd
+    ? renderMd(impactMd, repoSlug, ".research/impact")
+    : `<p>${COPY.assessmentPending}</p>`;
   return `
     <section class="impact">
       <h3>${COPY.whatChanges}</h3>
@@ -264,7 +278,7 @@ function renderUpdatePage(update: PendingUpdate, data: SiteData): string {
   <article>
     <h2>${COPY.editionLabel} ${descriptor}</h2>
     <p class="meta">${escapeText(datePart(update.proposedAt))} — <span class="badge">${COPY.awaiting}</span></p>
-    ${renderImpactSection(update.impactMd)}
+    ${renderImpactSection(update.impactMd, data.repoSlug)}
     ${renderProvenanceSection(update.provenance)}
     <p class="note">${COPY.reviewNote}</p>
     <p><a href="${safeHrefAttr(update.githubUrl)}">${COPY.githubLink}</a></p>

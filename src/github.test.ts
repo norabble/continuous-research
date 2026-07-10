@@ -6,6 +6,7 @@ import {
   isNotFoundError,
   latestTrustedCommentBody,
   mapPullRequestToOpenPullRequest,
+  isPlainIssue,
   type RawIssue,
   type RawPullRequest,
 } from "./github";
@@ -127,5 +128,25 @@ describe("isNotFoundError", () => {
     expect(isNotFoundError({ status: 500 })).toBe(false);
     expect(isNotFoundError(new Error("nope"))).toBe(false);
     expect(isNotFoundError(null)).toBe(false);
+  });
+});
+
+describe("isPlainIssue", () => {
+  it("true for a plain issue (no pull_request)", () => {
+    expect(isPlainIssue({ number: 1, state: "open", labels: [], pull_request: undefined })).toBe(
+      true,
+    );
+    expect(isPlainIssue({ number: 1, state: "open", labels: [], pull_request: null })).toBe(true);
+  });
+
+  it("false for a PR item (listForRepo returns PRs too; drift issues are plain issues)", () => {
+    expect(
+      isPlainIssue({
+        number: 1,
+        state: "open",
+        labels: [],
+        pull_request: { merged_at: null },
+      }),
+    ).toBe(false);
   });
 });

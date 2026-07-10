@@ -72,6 +72,11 @@ export function mapPullRequestToOpenPullRequest(raw: RawPullRequest): OpenPullRe
   };
 }
 
+/** True when a listForRepo item is a plain issue — drift issues are never PRs. */
+export function isPlainIssue(raw: RawIssue): boolean {
+  return !raw.pull_request;
+}
+
 export function isNotFoundError(error: unknown): boolean {
   return typeof error === "object" && error !== null && "status" in error && error.status === 404;
 }
@@ -251,6 +256,59 @@ export class OctokitGitHubPort implements GitHubPort {
       repo: this.repo,
       issue_number: prNumber,
       labels,
+    });
+  }
+
+  async listOpenIssueNumbersByLabel(label: string): Promise<number[]> {
+    const { data } = await this.octokit.rest.issues.listForRepo({
+      owner: this.owner,
+      repo: this.repo,
+      labels: label,
+      state: "open",
+    });
+    // listForRepo returns PRs too; drift issues are plain issues.
+    return data.filter(isPlainIssue).map((i) => i.number);
+  }
+
+  async ensureLabel(name: string, description: string, color: string): Promise<void> {
+    try {
+      await this.octokit.rest.issues.createLabel({
+        owner: this.owner,
+        repo: this.repo,
+        name,
+        description,
+        color,
+      });
+    } catch (err) {
+      if ((err as { status?: number }).status !== 422) throw err; // 422 = exists
+    }
+  }
+
+  async createIssue(title: string, body: string, labels: string[]): Promise<number> {
+    const { data } = await this.octokit.rest.issues.create({
+      owner: this.owner,
+      repo: this.repo,
+      title,
+      body,
+      labels,
+    });
+    return data.number;
+  }
+
+  async commentOnIssue(issueNumber: number, body: string): Promise<void> {
+    await this.octokit.rest.issues.createComment({
+      owner: this.owner,
+      repo: this.repo,
+      issue_number: issueNumber,
+      body,
+    });
+  }
+
+  async lockIssue(issueNumber: number): Promise<void> {
+    await this.octokit.rest.issues.lock({
+      owner: this.owner,
+      repo: this.repo,
+      issue_number: issueNumber,
     });
   }
 }

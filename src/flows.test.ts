@@ -43,6 +43,13 @@ function recordingPort(): { port: GitHubPort; calls: string[] } {
       calls.push(`addLabels:${n}:${labels.join(",")}`);
       return Promise.resolve();
     },
+    // flows.ts never calls these (drift escalation lives in commands.ts) —
+    // inert, like the other reads/writes above that this file's flows don't touch.
+    listOpenIssueNumbersByLabel: () => Promise.resolve([]),
+    ensureLabel: () => Promise.resolve(),
+    createIssue: () => Promise.resolve(0),
+    commentOnIssue: () => Promise.resolve(),
+    lockIssue: () => Promise.resolve(),
   };
   return { port, calls };
 }

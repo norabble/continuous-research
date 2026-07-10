@@ -42,10 +42,10 @@ Merge authority stays with you. Agents only ever propose.
 In the repo root (new or existing project — `init` never overwrites):
 
 ```sh
-npx --yes github:norabble/continuous-research#v0.1.5 init
+npx --yes github:norabble/continuous-research#v0.1.6 init
 ```
 
-This scaffolds `.research/config.json` plus five workflows
+This scaffolds `.research/config.json` plus six workflows
 ([what each file is](./cli.md#init)). Then:
 
 1. **Wire your sensor.** Point `"sensor"` in `.research/config.json` at your
@@ -184,7 +184,7 @@ for qualifying a sensor before the App is wired:
 
 ```sh
 GITHUB_TOKEN=$(gh auth token) GITHUB_REPOSITORY=<owner>/<repo> \
-  npx --yes github:norabble/continuous-research#v0.1.5 sense
+  npx --yes github:norabble/continuous-research#v0.1.6 sense
 ```
 
 Know what changes in this mode:
@@ -211,6 +211,67 @@ set; enabling or disabling it never affects the sensing loop. Command,
 config schema, and the `results.json` shape:
 [cli.md → `impact`](./cli.md#impact--preview-since-v013-opt-in);
 design: [phase-2-plan](./phase-2-plan.md).
+
+## Going public
+
+Instances are cheapest to run public (unlimited Actions minutes) and the live
+site needs it — but flipping visibility exposes the loop's automated surfaces
+all at once. This is the checklist proven on the sample, in order:
+
+1. **Before flipping**, lock down the agent-consumed surfaces (the scaffold
+   already locks the sensor-drift issue at creation) and confirm no secrets
+   ever landed in history — a public repo's whole history is public.
+2. **Flip visibility, then immediately:**
+   - **Ruleset on `main`:** require pull requests, block force-push and
+     deletion. Bypass actors: the repo admin and **your App only** —
+     `GITHUB_TOKEN` can _never_ bypass a ruleset, which is exactly why the
+     scaffolded `sense`/`decline` workflows write via the minted App token,
+     not the workflow's own token.
+   - **Actions → General:** require approval for fork PRs from outside
+     collaborators (they otherwise run workflows on your dime).
+   - **Enable secret scanning + push protection.**
+   - Optionally enable **"require actions to be pinned to a full-length
+     commit SHA."** The scaffolded workflows already comply — every `uses:`
+     is SHA-pinned, including the inlined Pages upload (the stock
+     `upload-pages-artifact` composite _fails_ this policy, because it calls
+     `upload-artifact` by tag internally and the rule reaches nested
+     references).
+   - Before relying on data-PR-event site deploys, verify the
+     `github-pages` environment's deployment-branch policy accepts deploys
+     triggered from data-PR head branches (`data/<descriptor>`) — otherwise
+     every data-PR site deploy runs red. Fork-PR runs carry no secrets or
+     OIDC token regardless, so that deploy step fails there by design.
+3. **Then enable the site** (`site.enabled: true`, Pages source "GitHub
+   Actions" — full steps under _Publishing the live site_).
+
+**The sensor-repair agent's threat model.** If you keep the optional
+`sensor-repair.yml` Claude Code integration, understand what makes it safe on
+a public repo. The workflow is split into two jobs so a **write-capable
+GitHub token never enters the agent's environment**: the `repair` job runs
+the agent with a read-only token and captures its fix as an uploaded
+artifact; the deterministic `ship` job re-applies that patch (the sensor file
+only, enforced mechanically), re-runs the tests, and only then mints a
+downscoped App token to push the branch and open the PR. The agent reads
+untrusted content (the sensor-drift issue, live API responses) over open
+egress, so nothing in its environment may be worth stealing. The **Claude
+OAuth token is the consciously accepted residual**: open egress is required
+for source discovery, so exfiltration cannot be prevented outright —
+revocation is the backstop. Do **not** broaden the agent's `--allowedTools`
+list or add a write token to the `repair` job without re-doing this analysis;
+either move reintroduces exactly the capability the two-job split removes.
+
+One cross-workflow interaction worth knowing: the same App identity that
+authors data-PRs also authors `sensor-repair`'s fix PRs (the `ship` job
+mints and pushes with the same App token), so the interpretation workflow's
+`pull_request` trigger — scoped to that App's bots — fires on fix PRs too.
+Today the only guard against that is the interpretation prompt's own
+instruction to stop on any PR without a `data:` label, and fix-PR bodies
+deliberately embed untrusted source-response samples as evidence. The blast
+radius stays bounded regardless: the interpretation agent's safe-outputs are
+still confined to writing an impact declaration and `findings.md` on the PR
+branch, and every write is human-reviewed before merge. A mechanical (not
+prompt-level) `data:`-label gate on the interpretation trigger is tracked in
+the [backlog](./backlog.md).
 
 ## Publishing the live site
 
@@ -260,6 +321,20 @@ Instances pin the engine by tag, so nothing changes until you move the pin:
    regenerated locks.
 5. Dispatch **sense** once — a healthy `none`/`skip` confirms the new pin
    runs end-to-end.
+
+**Hardened mode — pin the engine to a commit, not a tag.** The scaffold pins
+the engine by tag (`#v0.1.6`), and a tag is mutable: whoever can move it runs
+on your next cron with your App token. Pinning to a full commit SHA instead —
+`github:norabble/continuous-research#<full-sha>` — removes that trust in the
+tag entirely. The trade-off is that upgrades become manual SHA bumps with no
+release-notes signpost, so you own tracking what changed. One empirical caveat
+if you take this path: a bare-commit git dependency installs only under **npm
+11 (node 24)** — npm 10 (node 22) cannot (`GitFetcher requires an Arborist
+constructor`), and archive tarballs are not a workaround (they skip
+`prepare`, so no built `dist/`). The scaffolded engine workflows already run
+node 24 for exactly this reason; keep it if you move to a commit pin. (The
+_actions_ those workflows call are already SHA-pinned — this concerns only the
+engine ref.)
 
 ## Guardrails you should keep
 

@@ -12,8 +12,9 @@ import { createRequire } from "node:module";
 import { dirname } from "node:path";
 import { parseConfig } from "./config";
 import { helpText } from "./help";
-import { runSense, runRecordDecline, runInit, runImpact, runSite } from "./commands";
+import { runSense, runRecordDecline, runInit, runImpact, runSite, escalateDrift } from "./commands";
 import { NEXT_STEPS } from "./scaffold";
+import { DRIFT_REPORT_PATH } from "./drift";
 import { execSensor, readArtifact, createGitHubPortFromEnv } from "./io";
 import { extractDeclineFromEvent } from "./event";
 
@@ -98,6 +99,7 @@ async function cmdSite(): Promise<number> {
     port,
     generatedAt: new Date().toISOString(),
     fallbackTitle: process.env.GITHUB_REPOSITORY ?? "research",
+    repoSlug: process.env.GITHUB_REPOSITORY ?? null,
   });
   if (files === null) {
     console.log("[site] disabled — nothing to do");
@@ -112,12 +114,30 @@ async function cmdSite(): Promise<number> {
   return 0;
 }
 
+async function cmdEscalateDrift(): Promise<number> {
+  const github = createGitHubPortFromEnv(process.env);
+  await escalateDrift({
+    github,
+    readReport: async () => {
+      try {
+        return await readFile(DRIFT_REPORT_PATH, "utf8");
+      } catch (err) {
+        if ((err as NodeJS.ErrnoException).code === "ENOENT") return null;
+        throw err;
+      }
+    },
+    log: (message) => console.log(message),
+  });
+  return 0;
+}
+
 const COMMANDS: Record<string, () => Promise<number>> = {
   init: cmdInit,
   sense: cmdSense,
   "record-decline": cmdRecordDecline,
   impact: cmdImpact,
   site: cmdSite,
+  "escalate-drift": cmdEscalateDrift,
 };
 
 /** Works from both src/ (tsx dev) and dist/ (built): ../package.json is the repo root. */
