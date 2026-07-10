@@ -6,12 +6,13 @@ describe("scaffoldFiles", () => {
   const files = scaffoldFiles();
   const byPath = (p: string) => files.find((f) => f.path === p)?.content ?? "";
 
-  it("emits the config, both engine workflows, the site workflow, and both agent templates", () => {
+  it("emits the config, both engine workflows, the site workflow, the optional sensor-repair workflow, and both agent templates", () => {
     expect(files.map((f) => f.path)).toEqual([
       ".research/config.json",
       ".github/workflows/sense.yml",
       ".github/workflows/decline.yml",
       ".github/workflows/site.yml",
+      ".github/workflows/sensor-repair.yml",
       ".github/workflows/interpretation.md",
       ".github/workflows/comment-resolution.md",
     ]);
@@ -80,6 +81,23 @@ describe("scaffoldFiles", () => {
     expect(decline).toContain("github.event.pull_request.merged == false");
     expect(decline).toContain("timeout-minutes:");
     expect(decline).toContain("record-decline");
+  });
+
+  it("sense template escalates drift after the engine run", () => {
+    const sense = byPath(".github/workflows/sense.yml");
+    expect(sense).toContain("escalate-drift");
+    // Escalation runs on the App token (issues write), same as the engine.
+    expect(sense.indexOf("escalate-drift")).toBeGreaterThan(sense.indexOf("app-token"));
+  });
+
+  it("scaffolds the optional sensor-repair workflow", () => {
+    const repair = byPath(".github/workflows/sensor-repair.yml");
+    expect(repair).toContain("anthropics/claude-code-action");
+    expect(repair).toContain("allowed_bots");
+    expect(repair).toContain("needs: repair"); // two-job token isolation
+    // Actions expressions survived TS-template escaping into the output:
+    expect(repair).toContain("${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}");
+    expect(repair).toContain("${GH_TOKEN}"); // shell brace expansion intact too
   });
 
   it("interpretation.md carries the proven gh-aw safe-output contract", () => {

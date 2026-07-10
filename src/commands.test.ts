@@ -206,6 +206,7 @@ describe("runInit", () => {
       { path: ".github/workflows/sense.yml", created: true },
       { path: ".github/workflows/decline.yml", created: true },
       { path: ".github/workflows/site.yml", created: true },
+      { path: ".github/workflows/sensor-repair.yml", created: true },
       { path: ".github/workflows/interpretation.md", created: true },
       { path: ".github/workflows/comment-resolution.md", created: true },
     ]);
@@ -213,6 +214,7 @@ describe("runInit", () => {
       ".github/workflows/sense.yml",
       ".github/workflows/decline.yml",
       ".github/workflows/site.yml",
+      ".github/workflows/sensor-repair.yml",
       ".github/workflows/interpretation.md",
       ".github/workflows/comment-resolution.md",
     ]);
