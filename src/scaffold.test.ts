@@ -5,6 +5,7 @@ import { parseConfig } from "./config";
 describe("scaffoldFiles", () => {
   const files = scaffoldFiles();
   const byPath = (p: string) => files.find((f) => f.path === p)?.content ?? "";
+  const fileContent = byPath;
 
   it("emits the config, both engine workflows, the site workflow, the optional sensor-repair workflow, and both agent templates", () => {
     expect(files.map((f) => f.path)).toEqual([
@@ -24,9 +25,9 @@ describe("scaffoldFiles", () => {
     expect(site).toContain("npx --yes github:norabble/continuous-research#v0.1.5 site");
     expect(site).toContain("pages: write");
     // A fresh scaffold ships site.enabled=false, so the engine writes no
-    // _site/ — the upload/deploy steps must be gated on the build having
-    // produced output, or every PR/push fails CI out of the box.
-    expect(site.match(/if: hashFiles\('_site\/\*\*'\) != ''/g)).toHaveLength(2);
+    // _site/ — the package/upload/deploy steps must all be gated on the
+    // build having produced output, or every PR/push fails CI out of the box.
+    expect(site.match(/if: hashFiles\('_site\/\*\*'\) != ''/g)).toHaveLength(3);
     // PR events matter only for data-PRs; push/dispatch always rebuild.
     expect(site).toContain(
       "github.event_name != 'pull_request' ||\n" +
@@ -63,7 +64,9 @@ describe("scaffoldFiles", () => {
 
   it("sense.yml mints an App token and hands it to the engine", () => {
     const sense = byPath(".github/workflows/sense.yml");
-    expect(sense).toContain("actions/create-github-app-token@v2");
+    expect(sense).toContain(
+      "actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2",
+    );
     // Literal Actions expressions must survive (not TS interpolation).
     expect(sense).toContain("app-id: ${{ secrets.CONTINUOUS_RESEARCH_APP_ID }}");
     expect(sense).toContain("GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}");
@@ -113,5 +116,34 @@ describe("scaffoldFiles", () => {
     // the gh-aw prompt renderer strips HTML comments even inside code spans.
     expect(interp).toContain("claim: <id> | backs: <result keys> | status: <status>");
     expect(interp).not.toContain("<!--");
+  });
+
+  it("pins every action reference to a full commit SHA", () => {
+    for (const f of scaffoldFiles()) {
+      for (const line of f.content.split("\n")) {
+        if (line.includes("uses:")) {
+          expect(line, `${f.path}: ${line}`).toMatch(/@[0-9a-f]{40} # v\d/);
+        }
+      }
+    }
+  });
+
+  it("engine-running workflows use node 24 (npm 11 installs commit-pinned git deps)", () => {
+    for (const p of ["sense.yml", "decline.yml", "site.yml"]) {
+      expect(fileContent(`.github/workflows/${p}`)).toContain('node-version: "24"');
+    }
+  });
+
+  it("decline writes main via the App token, not GITHUB_TOKEN", () => {
+    const decline = fileContent(".github/workflows/decline.yml");
+    expect(decline).toContain("create-github-app-token");
+    expect(decline).toContain("permission-contents: write");
+    expect(decline).not.toMatch(/GITHUB_TOKEN: \$\{\{ secrets.GITHUB_TOKEN \}\}/);
+  });
+
+  it("site inlines the Pages upload (no composite with nested unpinned refs)", () => {
+    const site = fileContent(".github/workflows/site.yml");
+    expect(site).not.toContain("upload-pages-artifact");
+    expect(site).toContain("name: github-pages");
   });
 });

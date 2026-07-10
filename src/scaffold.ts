@@ -51,16 +51,21 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: "22"
+          node-version: "24" # npm 11: npm 10 (node 22) cannot install commit-pinned git deps
       - name: Mint App installation token
         id: app-token
-        uses: actions/create-github-app-token@v2
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
         with:
           app-id: \${{ secrets.CONTINUOUS_RESEARCH_APP_ID }}
           private-key: \${{ secrets.CONTINUOUS_RESEARCH_APP_PRIVATE_KEY }}
+          # Downscope to the sensing loop's needs: push data branches, open
+          # data-PRs, file/lock the drift issue.
+          permission-contents: write
+          permission-issues: write
+          permission-pull-requests: write
       - name: sense
         env:
           GITHUB_TOKEN: \${{ steps.app-token.outputs.token }}
@@ -83,8 +88,11 @@ on:
   pull_request:
     types: [closed]
 
+# The decline record lands on main. If main carries a ruleset, GITHUB_TOKEN
+# can never bypass it — the App can. The workflow's own token stays
+# read-only either way.
 permissions:
-  contents: write
+  contents: read
   issues: read
   pull-requests: read
 
@@ -97,13 +105,22 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: "22"
+          node-version: "24" # npm 11: npm 10 (node 22) cannot install commit-pinned git deps
+      - name: Mint App installation token
+        id: app-token
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
+        with:
+          app-id: \${{ secrets.CONTINUOUS_RESEARCH_APP_ID }}
+          private-key: \${{ secrets.CONTINUOUS_RESEARCH_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-issues: read
+          permission-pull-requests: read
       - name: record-decline
         env:
-          GITHUB_TOKEN: \${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: \${{ steps.app-token.outputs.token }}
         run: npx --yes github:norabble/continuous-research#v0.1.5 record-decline
 `;
 
@@ -142,23 +159,31 @@ jobs:
       name: github-pages
       url: \${{ steps.deploy.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: "22"
+          node-version: "24" # npm 11: npm 10 (node 22) cannot install commit-pinned git deps
       - name: build
         env:
           GITHUB_TOKEN: \${{ secrets.GITHUB_TOKEN }}
         run: npx --yes github:norabble/continuous-research#v0.1.5 site
-      - uses: actions/upload-pages-artifact@v3
-        # Skipped when the site layer is disabled (the engine then writes no
-        # _site/) — the job stays green so a fresh scaffold never fails CI.
+      # Inlined the official Pages-upload composite action: it calls
+      # actions/upload-artifact by tag internally, which repos enforcing
+      # required SHA pinning reject (the policy applies to nested
+      # references). These two steps are exactly what that composite does.
+      - name: Package site for Pages
+        if: hashFiles('_site/**') != ''
+        run: tar --dereference --hard-dereference -cvf "$RUNNER_TEMP/artifact.tar" -C _site .
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         if: hashFiles('_site/**') != ''
         with:
-          path: _site
+          name: github-pages
+          path: \${{ runner.temp }}/artifact.tar
+          retention-days: 1
+          if-no-files-found: error
       - id: deploy
         if: hashFiles('_site/**') != ''
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
 `;
 
 const SENSOR_REPAIR_WORKFLOW = `name: sensor-repair
@@ -205,14 +230,14 @@ jobs:
       contents: read
       issues: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           # No credentials in .git/config for the agent's Bash to find.
           persist-credentials: false
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "22"
-      - uses: anthropics/claude-code-action@v1
+      - uses: anthropics/claude-code-action@0fe28cdb64e23015219b0e478100b7105fd7dfa1 # v1
         with:
           claude_code_oauth_token: \${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           # Read-only, passed explicitly: otherwise the action mints a
@@ -251,9 +276,9 @@ jobs:
               source, a trimmed sample of its real response, why it fits).
               No "Fixes #N" line; the ship job appends it.
       - name: Collect the repair artifact
-        # TODO: replace sensor.mjs with your sensor file (both lines). The
-        # pathspec is the mechanical write-surface constraint: edits to any
-        # other file do not ship.
+        # TODO: replace sensor.mjs with your sensor file. The pathspec is the
+        # mechanical write-surface constraint: edits to any other file do not
+        # ship.
         run: |
           mkdir -p "$RUNNER_TEMP/repair-artifact"
           git diff -- sensor.mjs > "$RUNNER_TEMP/repair-artifact/sensor.patch"
@@ -268,7 +293,7 @@ jobs:
             fi
             cp "repair-out/$f" "$RUNNER_TEMP/repair-artifact/$f"
           done
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: sensor-repair-output
           path: \${{ runner.temp }}/repair-artifact
@@ -282,13 +307,13 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           persist-credentials: false
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "22"
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: sensor-repair-output
           path: \${{ runner.temp }}/repair-artifact
@@ -311,7 +336,7 @@ jobs:
           node --test
       - name: Mint App installation token
         id: app-token
-        uses: actions/create-github-app-token@v2
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
         with:
           app-id: \${{ secrets.CONTINUOUS_RESEARCH_APP_ID }}
           private-key: \${{ secrets.CONTINUOUS_RESEARCH_APP_PRIVATE_KEY }}
