@@ -45,7 +45,7 @@ In the repo root (new or existing project — `init` never overwrites):
 npx --yes github:norabble/continuous-research#v0.1.6 init
 ```
 
-This scaffolds `.research/config.json` plus five workflows
+This scaffolds `.research/config.json` plus six workflows
 ([what each file is](./cli.md#init)). Then:
 
 1. **Wire your sensor.** Point `"sensor"` in `.research/config.json` at your
@@ -236,6 +236,11 @@ all at once. This is the checklist proven on the sample, in order:
      `upload-pages-artifact` composite _fails_ this policy, because it calls
      `upload-artifact` by tag internally and the rule reaches nested
      references).
+   - Before relying on data-PR-event site deploys, verify the
+     `github-pages` environment's deployment-branch policy accepts deploys
+     triggered from data-PR head branches (`data/<descriptor>`) — otherwise
+     every data-PR site deploy runs red. Fork-PR runs carry no secrets or
+     OIDC token regardless, so that deploy step fails there by design.
 3. **Then enable the site** (`site.enabled: true`, Pages source "GitHub
    Actions" — full steps under _Publishing the live site_).
 
@@ -254,6 +259,19 @@ for source discovery, so exfiltration cannot be prevented outright —
 revocation is the backstop. Do **not** broaden the agent's `--allowedTools`
 list or add a write token to the `repair` job without re-doing this analysis;
 either move reintroduces exactly the capability the two-job split removes.
+
+One cross-workflow interaction worth knowing: the same App identity that
+authors data-PRs also authors `sensor-repair`'s fix PRs (the `ship` job
+mints and pushes with the same App token), so the interpretation workflow's
+`pull_request` trigger — scoped to that App's bots — fires on fix PRs too.
+Today the only guard against that is the interpretation prompt's own
+instruction to stop on any PR without a `data:` label, and fix-PR bodies
+deliberately embed untrusted source-response samples as evidence. The blast
+radius stays bounded regardless: the interpretation agent's safe-outputs are
+still confined to writing an impact declaration and `findings.md` on the PR
+branch, and every write is human-reviewed before merge. A mechanical (not
+prompt-level) `data:`-label gate on the interpretation trigger is tracked in
+the [backlog](./backlog.md).
 
 ## Publishing the live site
 

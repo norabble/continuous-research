@@ -589,4 +589,18 @@ describe("escalateDrift", () => {
     expect(github.issueComments[0]!.issueNumber).toBe(17);
     expect(github.lockedIssues).toContain(17);
   });
+
+  it("rejects a malformed report before any GitHub write (fail-fast)", async () => {
+    const github = new FakeGitHubPort();
+    await expect(
+      escalateDrift({
+        github,
+        readReport: () => Promise.resolve("not json"),
+        log: () => {},
+      }),
+    ).rejects.toThrow();
+    expect(github.ensuredLabels).toHaveLength(0);
+    expect(github.createdIssues).toHaveLength(0);
+    expect(github.lockedIssues).toHaveLength(0);
+  });
 });

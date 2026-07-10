@@ -22,19 +22,29 @@ export interface DriftEscalationPlan {
 }
 
 /**
+ * Parse and validate a drift report: must be a JSON object. Throws TypeError
+ * otherwise (the report is sensor-authored; a broken report should fail the
+ * run loudly, not file a garbage issue). Exported so callers (escalateDrift)
+ * can validate a report BEFORE any GitHub write, not just inside the planner.
+ */
+export function parseDriftReport(reportJson: string): Record<string, unknown> {
+  const parsed: unknown = JSON.parse(reportJson);
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    throw new TypeError("drift report must be a JSON object");
+  }
+  return parsed as Record<string, unknown>;
+}
+
+/**
  * Decide how a drift report escalates. One open issue is the dedup unit:
  * re-runs comment on it instead of re-filing. Throws TypeError if
- * reportJson is not a JSON object (the report is sensor-authored; a broken
- * report should fail the run loudly, not file a garbage issue).
+ * reportJson is not a JSON object (see {@link parseDriftReport}).
  */
 export function planDriftEscalation(
   reportJson: string,
   openIssueNumbers: number[],
 ): DriftEscalationPlan {
-  const parsed: unknown = JSON.parse(reportJson);
-  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-    throw new TypeError("drift report must be a JSON object");
-  }
+  const parsed = parseDriftReport(reportJson);
   const body = [
     "The sense run could not produce an edition — the sensor is broken or its",
     "source moved.",

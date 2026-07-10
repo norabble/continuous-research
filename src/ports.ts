@@ -65,7 +65,7 @@ export interface GitHubPort {
   // --- issues (drift escalation) ---
   /** Numbers of OPEN issues carrying the given label. */
   listOpenIssueNumbersByLabel(label: string): Promise<number[]>;
-  /** Create-or-update the label (idempotent). */
+  /** Create the label if absent (already-exists is not an error; never updates an existing label). */
   ensureLabel(name: string, description: string, color: string): Promise<void>;
   /** Opens an issue, returns its number. */
   createIssue(title: string, body: string, labels: string[]): Promise<number>;

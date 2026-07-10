@@ -22,6 +22,16 @@ Deferred items, none scheduled. Each entry says why it matters and what
   `\r\n`→`\n` normalization atop renderUntrustedMarkdown; clear `_site/`
   before local writes (stale updates/*.html across local previews).
 
+- **Mechanical `data:`-label gate on interpretation** — the interpretation
+  workflow triggers on every App-authored PR, including `sensor-repair`'s fix
+  PRs, whose bodies deliberately embed untrusted source-response samples; the
+  `data:`-label guard today is prompt-level only (the workflow's own "stop if
+  no `data:` label" instruction, not the trigger). Done = the scaffolded
+  interpretation workflow (and the sample's) refuses non-`data:` PRs
+  mechanically — investigate gh-aw frontmatter support for label conditions
+  on the trigger (do not guess the syntax in the template now) — plus the
+  sample re-qualified against it.
+
 - **Impact declarations should lead with the revised claim** — the site's
   pending-update excerpt shows the impact markdown from the top, and the
   scaffolded interpretation template writes *prior claim first*, so the

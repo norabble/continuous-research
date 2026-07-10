@@ -35,6 +35,7 @@ Both run inside **GitHub Actions workflows**, which provide the triggers:
 | `interpretation`     | a new data-PR       | read the new data + claims → write the impact declaration | agent  | **built**   |
 | `comment-resolution` | `/resolve <request>` | address the reviewer's request on the data-PR branch     | agent  | **built**   |
 | `site`               | data-PR events / findings pushes | build the read-only site → GitHub Pages       | engine | **built**   |
+| `sensor-repair`      | `sensor-drift` issue labeled / dispatch | optional Claude Code integration: two-job drift repair (read-only agent proposes a fix, deterministic job ships it) | agent | **built**   |
 
 The first four run in
 [the sample instance](https://github.com/norabble/continuous-research-sample)

@@ -30,6 +30,7 @@ Scaffolds a Continuous Research instance into the current directory:
 | `.github/workflows/sense.yml` | engine workflow: dispatch/cron → `sense` |
 | `.github/workflows/decline.yml` | engine workflow: PR closed-unmerged → `record-decline` |
 | `.github/workflows/site.yml` | engine workflow: data-PR events / findings pushes → `site` → GitHub Pages (gated: green while the site layer is disabled) |
+| `.github/workflows/sensor-repair.yml` | optional Claude Code integration: two-job drift repair (delete the file to opt out) |
 | `.github/workflows/interpretation.md` | gh-aw agentic workflow (compile with `gh aw compile`) |
 | `.github/workflows/comment-resolution.md` | gh-aw agentic workflow (`/resolve` slash command) |
 
@@ -37,7 +38,8 @@ Scaffolds a Continuous Research instance into the current directory:
 it is safe to run in a non-empty repository. It needs no network, tokens, or
 git state, and it ends by printing the manual next steps (App creation,
 secrets, `gh aw compile`). The two `.md` workflows contain `TODO` markers you
-must fill in before compiling.
+must fill in before compiling; `sensor-repair.yml` carries `TODO` markers of
+its own too, though (being plain YAML, not gh-aw) it needs no compile step.
 
 ### `sense`
 
@@ -150,6 +152,11 @@ A report that is valid JSON but **not an object** (an array, string, or
 number) fails the run (exit 1) before any issue is touched — the report is
 sensor-authored, and a broken one should fail loudly rather than file a
 garbage issue.
+
+**Fence safety:** the report is embedded verbatim in a fenced JSON code
+block in the issue body, so sensors should not relay raw response bodies
+into the report — a hostile source's payload could break the fence. Keep
+`reason` / `detail` as short summaries, not raw dumps.
 
 ### `impact` — _preview (since `v0.1.3`; opt-in)_
 

@@ -27,6 +27,7 @@ import {
   DRIFT_LABEL,
   DRIFT_LABEL_COLOR,
   DRIFT_LABEL_DESCRIPTION,
+  parseDriftReport,
   planDriftEscalation,
 } from "./drift";
 
@@ -275,6 +276,10 @@ export async function escalateDrift(deps: EscalateDriftDeps): Promise<EscalateDr
     deps.log("escalate-drift: no drift report — nothing to do");
     return { outcome: "no-drift" };
   }
+  // Fail-fast: validate the report BEFORE any GitHub write. planDriftEscalation
+  // re-parses below (kept simple, signatures stable) — this call exists only to
+  // reject a malformed report ahead of ensureLabel/listOpenIssueNumbersByLabel.
+  parseDriftReport(report);
   await deps.github.ensureLabel(DRIFT_LABEL, DRIFT_LABEL_DESCRIPTION, DRIFT_LABEL_COLOR);
   const open = await deps.github.listOpenIssueNumbersByLabel(DRIFT_LABEL);
   const plan = planDriftEscalation(report, open);
