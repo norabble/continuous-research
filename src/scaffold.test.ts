@@ -28,9 +28,15 @@ describe("scaffoldFiles", () => {
     // _site/ — the package/upload/deploy steps must all be gated on the
     // build having produced output, or every PR/push fails CI out of the box.
     expect(site.match(/if: hashFiles\('_site\/\*\*'\) != ''/g)).toHaveLength(3);
-    // PR events matter only for data-PRs; push/dispatch always rebuild.
+    // PR builds must run in base context (pull_request_target): the default
+    // github-pages environment branch policy only lets the default branch
+    // deploy, and pull_request runs deploy from refs/pull/N/merge.
+    expect(site).toContain("pull_request_target:");
+    expect(site).not.toMatch(/^\s*pull_request:/m);
+    // PR events matter only for data-PRs; push/dispatch always rebuild. The
+    // gate's event name must match the trigger, or it never applies.
     expect(site).toContain(
-      "github.event_name != 'pull_request' ||\n" +
+      "github.event_name != 'pull_request_target' ||\n" +
         "      contains(join(github.event.pull_request.labels.*.name, ','), 'data:')",
     );
     // Literal Actions expressions must survive (not TS interpolation).
