@@ -130,11 +130,24 @@ const SITE_WORKFLOW = `name: site
 # .research/config.json and turn on Pages (Settings → Pages → source "GitHub
 # Actions").
 on:
-  pull_request:
+  # pull_request_target, not pull_request: the run stays in base context
+  # (github.ref = the default branch), which the github-pages environment's
+  # default main-only branch policy accepts — pull_request runs deploy from
+  # refs/pull/N/merge and are rejected before any step. Safe here: the
+  # checkout below is the base ref (no PR code is executed); the build reads
+  # PR content via the GitHub API and the engine sanitizes it; and the data:
+  # label gate keeps fork PRs out (labels are App/maintainer-set only).
+  pull_request_target:
     types: [opened, synchronize, reopened, closed]
   push:
     branches: [main]
     paths: ["findings.md", ".research/**"]
+  # Uncomment with the site: an agent that pushes to a data-PR with
+  # GITHUB_TOKEN (e.g. the interpretation step's impact commit) creates
+  # synchronize events that cannot trigger workflow runs, so without a
+  # periodic rebuild the live site misses them until merge.
+  # schedule:
+  #   - cron: "0 2 * * *"
   workflow_dispatch:
 
 permissions:
@@ -151,7 +164,7 @@ jobs:
     # PR events matter only for data-PRs (the pending-updates section);
     # pushes to main and manual dispatch always rebuild.
     if: >-
-      github.event_name != 'pull_request' ||
+      github.event_name != 'pull_request_target' ||
       contains(join(github.event.pull_request.labels.*.name, ','), 'data:')
     runs-on: ubuntu-latest
     timeout-minutes: 10

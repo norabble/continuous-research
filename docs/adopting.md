@@ -236,11 +236,15 @@ all at once. This is the checklist proven on the sample, in order:
      `upload-pages-artifact` composite _fails_ this policy, because it calls
      `upload-artifact` by tag internally and the rule reaches nested
      references).
-   - Before relying on data-PR-event site deploys, verify the
-     `github-pages` environment's deployment-branch policy accepts deploys
-     triggered from data-PR head branches (`data/<descriptor>`) — otherwise
-     every data-PR site deploy runs red. Fork-PR runs carry no secrets or
-     OIDC token regardless, so that deploy step fails there by design.
+   - Data-PR-event site deploys pass the `github-pages` environment's
+     default deployment-branch policy (default branch only) as scaffolded:
+     the site workflow triggers on `pull_request_target`, so the run stays
+     in base context and deploys from the default branch — plain
+     `pull_request` runs would deploy from `refs/pull/N/merge` and be
+     rejected before any step. Keep that trigger (and keep its job gate's
+     event name in sync) if you edit the workflow; there is no need to
+     loosen the branch policy. Fork-PR runs carry no secrets or OIDC token
+     regardless, and the `data:` label gate keeps them out of the job.
 3. **Then enable the site** (`site.enabled: true`, Pages source "GitHub
    Actions" — full steps under _Publishing the live site_).
 
