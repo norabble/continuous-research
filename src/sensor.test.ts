@@ -28,6 +28,42 @@ describe("parseDetectionResult", () => {
     expect(parseDetectionResult(JSON.stringify(changed))).toEqual(changed);
   });
 
+  // The v2 provenance fields are optional: an existing sensor that knows
+  // nothing about them must keep parsing exactly as before.
+  it("omits sources / generated when the sensor does not supply them", () => {
+    const out = parseDetectionResult(JSON.stringify(changed));
+    expect(out).not.toHaveProperty("sources");
+    expect(out).not.toHaveProperty("generated");
+  });
+
+  it("parses optional sources and generated when present", () => {
+    const out = parseDetectionResult(
+      JSON.stringify({
+        ...changed,
+        sources: [
+          { id: "candles", resource: "https://api.example/btc", lastModified: "2026-06-27" },
+        ],
+        generated: { by: "process:trip-wire", at: "2026-06-27T00:00:00Z" },
+      }),
+    );
+    expect(out).toMatchObject({
+      sources: [{ id: "candles", resource: "https://api.example/btc", lastModified: "2026-06-27" }],
+      generated: { by: "process:trip-wire", at: "2026-06-27T00:00:00Z" },
+    });
+  });
+
+  it("rejects a malformed sources / generated block, naming the field", () => {
+    expect(() => parseDetectionResult(JSON.stringify({ ...changed, sources: [] }))).toThrow(
+      /"sources" must be a non-empty array/,
+    );
+    expect(() => parseDetectionResult(JSON.stringify({ ...changed, sources: [{}] }))).toThrow(
+      /"sources\[0\]\.resource" must be a non-empty string/,
+    );
+    expect(() =>
+      parseDetectionResult(JSON.stringify({ ...changed, generated: { by: "x" } })),
+    ).toThrow(/"generated\.at" must be a non-empty string/);
+  });
+
   it("defaults artifacts to []", () => {
     expect(parseDetectionResult(JSON.stringify(withoutArtifacts))).toEqual({
       ...withoutArtifacts,

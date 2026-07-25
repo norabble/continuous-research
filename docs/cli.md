@@ -319,6 +319,13 @@ or a new edition exists:
 | `retrievedAt` | ISO-8601 timestamp |
 | `hash` | content hash formatted `algo:hexdigest`, e.g. `sha256:…` |
 | `artifacts` | optional; paths the sensor has **already written into the working tree**. The engine reads them and commits them on the data-PR branch. Any repo-root-relative file path is allowed — including files under `.research/` (e.g. a sensor-maintained source registry riding the data-PR). Omitted ⇒ only the provenance stub is committed. |
+| `sources` | optional; a sensor reading **several materials** names them here instead of relying on the flat `source`. Each entry is `{ resource, id?, title?, lastModified?, hash? }`; `resource` is required, `lastModified` is date-only (`YYYY-MM-DD`), `hash` is `algo:hexdigest`. Ids must be unique and safe as citation keys. Omitted ⇒ `source` becomes a single entry keyed by the descriptor. |
+| `generated` | optional; `{ by, at }` recording **what produced this edition**. `by` follows the actor grammar `human:<id>` \| `process:<id>` \| `<producer>/<version>`; `at` is ISO-8601. Omitted ⇒ the stub carries no `generated` block. |
+
+Both `sources` and `generated` are **optional and additive** — a sensor written
+before they existed keeps working unchanged. They exist so provenance can record
+what an edition rests on and what produced it at the moment that is known, rather
+than being reconstructed later ([interop](./okf-interop.md)).
 
 Contract notes:
 
@@ -346,7 +353,7 @@ that never drifts need not know the mechanism exists.
 | PR title | `data: <descriptor>` |
 | PR body | templated impact-declaration stub (source / retrieved / hash); the agent layer replaces this with prose interpretation on the PR branch |
 | Label | `data:<descriptor>` — the dedup key; do not remove it |
-| Provenance stub | `.research/provenance/<descriptor>.json`, schema `continuous-research/provenance@v1`: `{ schema, descriptor, source, retrievedAt, hash }`. Committed on the data-PR branch; lands on the default branch at merge, where it is the durable "merged" marker. |
+| Provenance stub | `.research/provenance/<descriptor>.json`, schema `continuous-research/provenance@v2`: `{ schema, descriptor, sources, retrievedAt, hash }` plus optional `generated` / `verified`. Committed on the data-PR branch; lands on the default branch at merge, where it is the durable "merged" marker. **`@v1` stubs still parse** (their flat `source` upcasts to a single `sources` entry keyed by the descriptor) and the path is unchanged, so existing instances need no migration. |
 | Decline record | `.research/decisions/<descriptor>.md` — YAML frontmatter (`descriptor`, `declined_at`, `data_pr`, `declined_by`) + the reason as body; committed straight to the default branch |
 | Commit messages | `data(<descriptor>): add <path>` / `decline(<descriptor>): record reason` |
 

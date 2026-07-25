@@ -69,6 +69,7 @@ export const COPY = {
   updatedPrefix: "Last updated",
   expandHint: "Show the full assessment",
   evidenceSource: "Source",
+  evidenceSources: "Sources",
   evidenceRetrieved: "Retrieved",
   evidenceHash: "Hash",
 } as const;
@@ -233,12 +234,21 @@ function renderIndex(data: SiteData): string {
 
 function renderProvenanceSection(provenance: ProvenanceStub | null): string {
   if (provenance === null) return "";
+  const multi = provenance.sources.length > 1;
+  // A <dl> may carry several <dd> under one <dt>; titles are project-authored
+  // so they go through escapeText like every other interpolated string.
+  const sourceItems = provenance.sources
+    .map((s) => {
+      const link = `<a href="${safeHrefAttr(s.resource)}">${escapeText(s.resource)}</a>`;
+      return `<dd>${s.title ? `${escapeText(s.title)} — ` : ""}${link}</dd>`;
+    })
+    .join("\n        ");
   return `
     <section class="evidence">
       <h3>${COPY.evidence}</h3>
       <dl>
-        <dt>${COPY.evidenceSource}</dt>
-        <dd><a href="${safeHrefAttr(provenance.source)}">${escapeText(provenance.source)}</a></dd>
+        <dt>${multi ? COPY.evidenceSources : COPY.evidenceSource}</dt>
+        ${sourceItems}
         <dt>${COPY.evidenceRetrieved}</dt>
         <dd>${escapeText(datePart(provenance.retrievedAt))}</dd>
         <dt>${COPY.evidenceHash}</dt>

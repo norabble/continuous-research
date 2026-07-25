@@ -51,9 +51,13 @@ export async function runSense(deps: SenseDeps): Promise<SenseOutcome> {
   const { state, action } = await dedupe(deps.port, descriptor);
   if (action === "skip") return { action: "skip", state, descriptor };
 
+  // `sources` / `generated` are optional in the sensor contract; when the
+  // sensor says nothing, the flat `source` upcasts to a single entry.
   const provenance = buildProvenanceStub({
     descriptor,
     source: detection.source,
+    ...(detection.sources !== undefined ? { sources: detection.sources } : {}),
+    ...(detection.generated !== undefined ? { generated: detection.generated } : {}),
     retrievedAt: detection.retrievedAt,
     hash: detection.hash,
   });
