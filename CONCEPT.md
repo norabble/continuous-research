@@ -1,10 +1,10 @@
 # Continuous Research — Concept
 
-> **Status:** Concept design **complete** — Q-A–Q-E resolved; conceptual
+> **Status:** Concept design **complete** — Q-A–Q-F resolved; conceptual
 > decisions are firm, build-time specifics deferred where noted. Still a living
 > document: it evolves like the thing it describes, and the reasoning behind
 > each change is preserved in git history.
-> **Last updated:** 2026-06-26
+> **Last updated:** 2026-07-25
 
 ## One-line framing
 
@@ -54,6 +54,9 @@ research efforts are **instances** built on top of it.
 - **Decline record** — `.research/decisions/<descriptor>.md`, logging a
   closed-unmerged data-PR's reason; feeds the evolution narrative. (See *Data
   sensing*.)
+- **Verification record** — the acceptance counterpart of the decline record:
+  who merged a data-PR and when, kept with the provenance stub so the human
+  review that authorized an edition survives outside GitHub. (See *Interop*.)
 - **Cost tier (0 / 1 / 2)** — which Claude credential pays for inference; Tier 0
   (subscription) is the default. (See *Cost tiers*.)
 
@@ -402,6 +405,51 @@ Advisory and tunable; never enforced.
 
 ---
 
+## Interop — external knowledge formats (Q-F — SETTLED)
+
+An instance's output *is* knowledge, and external formats now exist to carry it
+between systems. Interop is therefore worth having — but external formats
+change on someone else's schedule, and an instance's record must not.
+
+> **An export is a projection, never a second source of truth.**
+
+**Principles:**
+
+- **Derived, not canonical.** The instance's own artifacts stay authoritative;
+  an exported bundle is a build artifact on the same footing as the generated
+  site. It follows *Disableability* — independently switchable, **off by
+  default**, and its absence costs the loop nothing.
+- **Vocabulary containment.** An external format's terms live only in the
+  interop layer. They never enter *Canonical terms*, never rename a CR concept,
+  and never become the name of a mechanism. Where the two vocabularies collide
+  on a word (the same label meaning different things on different axes), the
+  export keeps them **separate fields** rather than reconciling them.
+- **Assert only what the loop establishes.** Trust signals are the point of
+  interop and the easiest thing to counterfeit. Export a signal only where a
+  real event backs it; where nothing backs it, emit nothing. An honest absence
+  is worth more than a synthesized attestation, and a format whose absences
+  carry meaning makes this a correctness rule, not a preference.
+- **Capture at the moment of knowledge.** A fact the exporter has to *guess* is
+  a fact the loop should have *recorded*. Where interop wants a field the
+  instance never wrote down, the fix belongs upstream at the point the fact was
+  known — not in the exporter. This is how Q-E's outstanding requirement (record
+  *how the judgment was made*) finally gets a home.
+- **Adopt the vocabulary, not the model.** External models carry assumptions CR
+  does not share. Take the field names; where the underlying model diverges,
+  **document the divergence** instead of contorting the loop to fit it.
+
+**Consequence for review.** Human merge is already the spine of the loop
+(Q-D), and it is exactly the event external formats mean by *verified*. The
+instance therefore has a genuine claim to the strongest trust signal these
+formats express — but only if acceptance is recorded as deliberately as
+rejection already is. The **decline record** captured half of that; the
+**verification record** is its counterpart.
+
+*(The concrete format mapping is a mechanism, not a concept: see
+[`docs/okf-interop.md`](./docs/okf-interop.md).)*
+
+---
+
 ## Phasing
 
 **Principle:** essentially every *optional* feature that doesn't require a hook
@@ -447,7 +495,7 @@ with minimal default bodies.**
 
 ---
 
-## Question log (Q-A … Q-E — all resolved)
+## Question log (Q-A … Q-F — all resolved)
 
 > The substantive concept design is complete. Each entry below is a resolved
 > pointer into the sections above; build-time specifics are deferred as noted.
@@ -494,3 +542,14 @@ Always commit results + non-deterministic intermediaries; default-skip large
 stable-source inputs + deterministic intermediaries; tunable by a cost-vs-risk
 dial. **Provenance is always kept** (descriptor + source + hash), separate from
 the storage choice, so lineage holds even when bytes aren't stored.
+
+### Q-F. Interop with external knowledge formats — *resolved* (see "Interop" above)
+Settled: export is a **projection**, never a second source of truth — derived,
+disableable, off by default. External vocabulary is contained in the interop
+layer and never enters *Canonical terms*. Trust signals are exported only where
+a real event backs them; where an external format wants a fact the loop never
+recorded, the fix goes **upstream to the moment the fact was known**, not into
+the exporter — which is how Q-E's outstanding "record how the judgment was made"
+requirement gets built. Human merge, already the review spine (Q-D), is the
+event these formats call *verified*; capturing it is the **verification
+record**, the acceptance counterpart to the decline record.

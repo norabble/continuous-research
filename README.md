@@ -176,6 +176,11 @@ to a live loop:
 - **[CLI + engine reference](./docs/cli.md)** — commands, environment, the
   config schema, the sensor contract, and exactly what the engine writes.
 
+Once a loop is running, [**OKF interop**](./docs/okf-interop.md) covers
+exporting an instance's record as an [Open Knowledge
+Format](https://github.com/GoogleCloudPlatform/knowledge-catalog/tree/main/okf)
+bundle — optional, off by default, and derived rather than canonical.
+
 ## Status
 
 Phase 1 complete (2026-07-03): `init` scaffolds the proven instance
