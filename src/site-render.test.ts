@@ -281,9 +281,9 @@ describe("renderSite update detail pages", () => {
           githubUrl: "https://g/pull/9",
           impactMd: "## Assessment\n\nOverturned.",
           provenance: {
-            schema: "continuous-research/provenance@v1",
+            schema: "continuous-research/provenance@v2",
             descriptor: "d1",
-            source: "https://src.example/x",
+            sources: [{ id: "d1", resource: "https://src.example/x" }],
             retrievedAt: "2026-07-05T00:00:00Z",
             hash: "sha256:abcd",
           },
@@ -309,9 +309,9 @@ describe("renderSite update detail pages", () => {
           githubUrl: "https://g/pull/10",
           impactMd: null,
           provenance: {
-            schema: "continuous-research/provenance@v1",
+            schema: "continuous-research/provenance@v2",
             descriptor: "d3",
-            source: "https://src.example/z",
+            sources: [{ id: "d3", resource: "https://src.example/z" }],
             retrievedAt: "2026-07-04T00:00:00Z",
             hash: "sha256:efgh",
           },

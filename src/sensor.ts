@@ -8,6 +8,7 @@
  */
 
 import type { Descriptor } from "./types";
+import type { Actor, ProvenanceSourceInput } from "./provenance";
 
 export type DetectionResult =
   | { changed: false }
@@ -18,15 +19,24 @@ export type DetectionResult =
       retrievedAt: string;
       hash: string;
       artifacts: string[];
+      /**
+       * Optional richer provenance (CONCEPT.md → Interop): a sensor that reads
+       * several materials names them here. Absent ⇒ the engine upcasts the flat
+       * `source`, so existing sensors keep working unchanged.
+       */
+      sources?: ProvenanceSourceInput[];
+      /** Optional: what produced this edition, in the OKF actor grammar. */
+      generated?: Actor;
     };
 
 /** Runs a sensor command and returns its stdout. Injected so orchestration stays pure. */
 export type SensorRunner = (command: string) => Promise<string>;
 
-function readString(obj: Record<string, unknown>, key: string): string {
+/** `label` names the field in errors; `key` is what we actually look up. */
+function readString(obj: Record<string, unknown>, key: string, label: string = key): string {
   const v = obj[key];
   if (typeof v !== "string" || v.trim() === "") {
-    throw new Error(`detection result "${key}" must be a non-empty string`);
+    throw new Error(`detection result "${label}" must be a non-empty string`);
   }
   return v;
 }
@@ -43,6 +53,43 @@ function parseArtifacts(value: unknown): string[] {
   return arr;
 }
 
+function parseSources(value: unknown): ProvenanceSourceInput[] | undefined {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value) || value.length === 0) {
+    throw new Error('detection result "sources" must be a non-empty array');
+  }
+  return (value as unknown[]).map((entry, i) => {
+    if (typeof entry !== "object" || entry === null || Array.isArray(entry)) {
+      throw new Error(`detection result "sources[${i}]" must be an object`);
+    }
+    const o = entry as Record<string, unknown>;
+    const out: ProvenanceSourceInput = {
+      resource: readString(o, "resource", `sources[${i}].resource`),
+    };
+    for (const key of ["id", "title", "lastModified", "hash"] as const) {
+      const v = o[key];
+      if (v === undefined) continue;
+      if (typeof v !== "string" || v.trim() === "") {
+        throw new Error(`detection result "sources[${i}].${key}" must be a non-empty string`);
+      }
+      out[key] = v;
+    }
+    return out;
+  });
+}
+
+function parseGenerated(value: unknown): Actor | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new Error('detection result "generated" must be an object');
+  }
+  const o = value as Record<string, unknown>;
+  return {
+    by: readString(o, "by", "generated.by"),
+    at: readString(o, "at", "generated.at"),
+  };
+}
+
 export function parseDetectionResult(stdout: string): DetectionResult {
   const data: unknown = JSON.parse(stdout);
   if (typeof data !== "object" || data === null) {
@@ -50,7 +97,7 @@ export function parseDetectionResult(stdout: string): DetectionResult {
   }
   const obj = data as Record<string, unknown>;
   if (obj.changed !== true) return { changed: false };
-  return {
+  const result: DetectionResult = {
     changed: true,
     descriptor: readString(obj, "descriptor"),
     source: readString(obj, "source"),
@@ -58,4 +105,9 @@ export function parseDetectionResult(stdout: string): DetectionResult {
     hash: readString(obj, "hash"),
     artifacts: parseArtifacts(obj.artifacts),
   };
+  const sources = parseSources(obj.sources);
+  if (sources !== undefined) result.sources = sources;
+  const generated = parseGenerated(obj.generated);
+  if (generated !== undefined) result.generated = generated;
+  return result;
 }
