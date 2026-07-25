@@ -5,7 +5,7 @@
  */
 
 import { exec } from "node:child_process";
-import { readFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import { promisify } from "node:util";
 import { Octokit } from "octokit";
 import type { SensorRunner } from "./sensor";
@@ -21,6 +21,26 @@ export const execSensor: SensorRunner = async (command) => {
 
 /** Reads an artifact the sensor wrote into the working tree. */
 export const readArtifact = (path: string): Promise<string> => readFile(path, "utf8");
+
+/**
+ * File names directly inside `path`, sorted; `[]` when the directory does not
+ * exist. The OKF export enumerates `.research/provenance/` and
+ * `.research/decisions/` this way — descriptors are not derivable from config,
+ * so the committed files are the only index of what an instance has accepted.
+ * An absent directory means "nothing yet", not an error.
+ */
+export async function listDir(path: string): Promise<string[]> {
+  try {
+    const entries = await readdir(path, { withFileTypes: true });
+    return entries
+      .filter((e) => e.isFile())
+      .map((e) => e.name)
+      .sort();
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return [];
+    throw error;
+  }
+}
 
 export function parseRepository(slug: string): { owner: string; repo: string } {
   const parts = slug.split("/");

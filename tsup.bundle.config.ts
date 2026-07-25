@@ -11,6 +11,19 @@ export default defineConfig({
   format: ["esm"],
   target: "node22",
   noExternal: [/.*/],
+  // Inlined CJS dependencies still call `require` at runtime (`yaml` resolves
+  // to its CJS build — its exports map offers ESM only under the browser
+  // condition — and requires "process" on load). An ESM bundle has no
+  // `require`, so esbuild substitutes a shim that throws. Defining a real one
+  // satisfies the shim's `typeof require !== "undefined"` guard and makes the
+  // vendor bundle runnable. `npm run build:bundle && node
+  // bundle/continuous-research.mjs --version` is the check that this holds.
+  banner: {
+    js: [
+      'import { createRequire as __ccrCreateRequire } from "node:module";',
+      "const require = __ccrCreateRequire(import.meta.url);",
+    ].join("\n"),
+  },
   splitting: false,
   clean: false,
   dts: false,

@@ -29,7 +29,7 @@ Scaffolds a Continuous Research instance into the current directory:
 | `.research/config.json` | the instance's hook declarations (see *Config*) |
 | `.github/workflows/sense.yml` | engine workflow: dispatch/cron → `sense` |
 | `.github/workflows/decline.yml` | engine workflow: PR closed-unmerged → `record-decline` |
-| `.github/workflows/site.yml` | engine workflow: data-PR events / findings pushes → `site` → GitHub Pages (gated: green while the site layer is disabled) |
+| `.github/workflows/site.yml` | engine workflow: data-PR events / findings pushes → `site` (+ `okf-export`) → GitHub Pages (gated: green while both layers are disabled) |
 | `.github/workflows/sensor-repair.yml` | optional Claude Code integration: two-job drift repair (delete the file to opt out) |
 | `.github/workflows/interpretation.md` | gh-aw agentic workflow (compile with `gh aw compile`) |
 | `.github/workflows/comment-resolution.md` | gh-aw agentic workflow (`/resolve` slash command) |
@@ -256,6 +256,55 @@ annotations (`<!-- claim: ... -->`) are stripped.
 stderr) before anything is written to `_site/` — a scaffolded deploy step
 then never runs, and the previously published site stays up.
 
+### `okf-export`
+
+Renders the instance's **accepted record** as an [Open Knowledge
+Format](https://github.com/GoogleCloudPlatform/knowledge-catalog/tree/main/okf)
+v0.2 bundle into `_okf/`. Opt-in via `okf.enabled`; see
+[OKF interop](./okf-interop.md) for the field mapping and the decisions behind
+it.
+
+```
+continuous-research okf-export
+```
+
+**Environment: none.** Unlike `site`, which surfaces *open* PRs and therefore
+needs the API, the bundle projects what has already been **accepted** — and
+that lives entirely in the checkout. No token, no network, reproducible
+offline.
+
+**Behavior, in order:**
+
+1. `okf` absent, or `okf.enabled` not `true` ⇒ exit 0, `[okf] disabled —
+   nothing to do`. **No directory is created.**
+2. Read every provenance stub in `.research/provenance/` and every decline
+   record in `.research/decisions/`. A missing directory means "nothing yet";
+   a **malformed** file fails the run (same fail-closed rule as `site`).
+3. Read the findings prose (`impact.findings`, default `findings.md`). Absent
+   is fine — the bundle is still conformant, just without findings.
+4. Render, then write each file under `_okf/`, logging
+   `[okf] wrote N files to _okf/`.
+
+**Output (under `_okf/`):**
+
+| File | Contents |
+| --- | --- |
+| `index.md` | bundle root: `okf_version` (the only frontmatter permitted here), then links to every concept |
+| `log.md` | `type: Log` — `**Accepted**` / `**Declined**` entries, newest-first under ISO date headings |
+| `findings/<claim-id>.md` | `type: Finding`, one per claim annotation |
+| `editions/<descriptor>.md` | `type: Edition`, one per accepted edition, carrying its full `sources` / `generated` / `verified` |
+
+**Citations are never invented.** A finding gets a `sources` list only when its
+prose names an edition (a backticked descriptor). Where it names none, the key
+is **omitted entirely** — not an empty list, and never a "nearest edition"
+guess. Absence is meaningful in OKF, and a fabricated citation would travel
+into consumers that treat it as fact. Likewise `verified` is emitted only from
+a real recorded merge.
+
+A **declined** edition never merged, so it gets no `Edition` concept — it
+appears in `log.md` only. Claim ids become file names and are agent-authored,
+so an id that is unsafe as a path is dropped rather than written.
+
 ## Config — `.research/config.json`
 
 ```json
@@ -268,6 +317,9 @@ then never runs, and the previously published site stays up.
   "site": {
     "enabled": true,
     "title": "BTC-USD, continuously"
+  },
+  "okf": {
+    "enabled": true
   }
 }
 ```
@@ -285,6 +337,9 @@ then never runs, and the previously published site stays up.
 | `site.enabled` | boolean, required in block | master toggle for the `site` command |
 | `site.title` | string | the site's title; falls back to `GITHUB_REPOSITORY` when absent |
 | `site.description` | string | optional one-line description shown under the title |
+| `okf.enabled` | boolean, required in block | master toggle for the `okf-export` command |
+| `okf.title` | string | the bundle's title; falls back to `site.title`, then `GITHUB_REPOSITORY` |
+| `okf.description` | string | optional one-line bundle description |
 
 The sensor (like the workflow files themselves) is trusted code: anyone who
 can edit it controls what runs in CI. Review changes to it like workflow

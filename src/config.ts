@@ -28,6 +28,15 @@ export interface SiteConfig {
   description?: string;
 }
 
+export interface OkfConfig {
+  /** Master toggle for the OKF export layer. Default off. */
+  enabled: boolean;
+  /** Bundle title; falls back to `site.title`, then the repo slug. */
+  title?: string;
+  /** Optional one-line bundle description. */
+  description?: string;
+}
+
 export interface ResearchConfig {
   /** Shell command the engine runs to detect new data (writes JSON to stdout). */
   sensor: string;
@@ -35,6 +44,8 @@ export interface ResearchConfig {
   impact?: ImpactConfig;
   /** Optional site generation config; absent ⇒ layer off. */
   site?: SiteConfig;
+  /** Optional OKF export config (CONCEPT.md → Interop); absent ⇒ layer off. */
+  okf?: OkfConfig;
 }
 
 function parseImpact(raw: unknown): ImpactConfig {
@@ -82,6 +93,23 @@ function parseSite(raw: unknown): SiteConfig {
   return out;
 }
 
+function parseOkf(raw: unknown): OkfConfig {
+  if (typeof raw !== "object" || raw === null) throw new Error('config "okf" must be an object');
+  const o = raw as Record<string, unknown>;
+  if (typeof o.enabled !== "boolean") throw new Error('config "okf.enabled" must be a boolean');
+  const out: OkfConfig = { enabled: o.enabled };
+  if (o.title !== undefined) {
+    if (typeof o.title !== "string") throw new Error('config "okf.title" must be a string');
+    out.title = o.title;
+  }
+  if (o.description !== undefined) {
+    if (typeof o.description !== "string")
+      throw new Error('config "okf.description" must be a string');
+    out.description = o.description;
+  }
+  return out;
+}
+
 export function parseConfig(json: string): ResearchConfig {
   const data: unknown = JSON.parse(json);
   if (typeof data !== "object" || data === null) throw new Error("config must be a JSON object");
@@ -93,5 +121,6 @@ export function parseConfig(json: string): ResearchConfig {
   const config: ResearchConfig = { sensor };
   if (obj.impact !== undefined) config.impact = parseImpact(obj.impact);
   if (obj.site !== undefined) config.site = parseSite(obj.site);
+  if (obj.okf !== undefined) config.okf = parseOkf(obj.okf);
   return config;
 }

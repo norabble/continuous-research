@@ -20,7 +20,8 @@ export interface ScaffoldFile {
 
 const CONFIG = `{
   "sensor": "node sensor.mjs",
-  "site": { "enabled": false, "title": "TODO: your project title" }
+  "site": { "enabled": false, "title": "TODO: your project title" },
+  "okf": { "enabled": false }
 }
 `;
 
@@ -180,6 +181,15 @@ jobs:
         env:
           GITHUB_TOKEN: \${{ secrets.GITHUB_TOKEN }}
         run: npx --yes github:norabble/continuous-research#v0.1.6 site
+      # The OKF bundle rides the site's Pages deploy — a repo has one Pages
+      # site, and this workflow owns it. Deliberately a SEPARATE step with no
+      # env: okf-export reads the checkout only, so it needs no token. It is a
+      # no-op (exit 0, no _okf/) unless okf.enabled is set.
+      - name: build OKF bundle
+        run: npx --yes github:norabble/continuous-research#v0.1.6 okf-export
+      - name: stage OKF bundle under _site/okf
+        if: hashFiles('_okf/**') != ''
+        run: mkdir -p _site/okf && cp -R _okf/. _site/okf/
       # Inlined the official Pages-upload composite action: it calls
       # actions/upload-artifact by tag internally, which repos enforcing
       # required SHA pinning reject (the policy applies to nested
@@ -544,7 +554,11 @@ Next steps:
   5. Site (optional): set site.enabled + title in .research/config.json,
      enable GitHub Pages (source: GitHub Actions), and dispatch the "site"
      workflow.
-  6. Sensor repair (optional, Claude Code): if you keep
+  6. OKF export (optional): set okf.enabled in .research/config.json to
+     render the accepted record as an Open Knowledge Format bundle into
+     _okf/. It needs no token and no network. With the site layer on, the
+     bundle is published alongside it at <pages-url>/okf/.
+  7. Sensor repair (optional, Claude Code): if you keep
      .github/workflows/sensor-repair.yml, set CLAUDE_CODE_OAUTH_TOKEN and
      fill in its TODOs (app slug, sensor file, candidate sources); your
      sensor must write .research/drift/report.json when it cannot produce
