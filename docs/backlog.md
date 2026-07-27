@@ -46,29 +46,11 @@ Deferred items, none scheduled. Each entry says why it matters and what
 
 The concept is settled (CONCEPT.md → *Interop*, Q-F) and the mapping is
 specified in [`okf-interop.md`](./okf-interop.md). The export mechanism
-(`okf-export`) and per-claim attribution both ship; these are what is left, in
-the order they were staged. Each is independently useful — none blocks another.
-
-- **Backfill `editions:` on the six existing claims** — the annotation's
-  optional `editions:` field ships (parser, linter rule, export, prompts), but
-  it only fills in going forward: the agent appends the edition it was
-  triggered by, so a claim gets attributed the next time an edition revises
-  it. The six claims already written across both instances carry nothing, and
-  token-source-review's prose names no descriptor, so it stays at **0 of 5**
-  attributed until they are filled in by hand. **Sequencing is binding:** an
-  engine older than the field's release parses a 4-field annotation with the
-  extra field absorbed into `status`, so both instances must be pinned to a
-  release carrying the fix *before* any prose gains the field. Done =
-  `btc-short-term-trend` → `btcusd-2026-06-27, btcusd-2026-07-01`;
-  `engine-model-token-limits` and `google-free-flash-lite-sessions` →
-  `limits-google-d1992c4c`; `copilot-free-incompatible` →
-  `limits-github-74e042c7`; and `session-budget` +
-  `consumer-subscriptions-incompatible` left **empty** — settled 2026-07-27:
-  both derive from the maintainer's deployment experience rather than from any
-  source edition (`session-budget` cites framework telemetry in its own
-  prose), so no edition established them and an absent citation is the true
-  statement. They are the case the design is built for, not an oversight:
-  attribution tops out at 4 of 6 and that is the honest number.
+(`okf-export`) and per-claim attribution both ship, and both instances are on
+v0.1.7 with their existing claims backfilled — 4 of 6 attributed, the other
+two deliberately empty because no edition established them. These are what is
+left, in the order they were staged. Each is independently useful — none
+blocks another.
 
 - **Verification record + freshness (`verified`, `stale_after`)** — human merge
   is already the review spine (Q-D) and is exactly what OKF means by
