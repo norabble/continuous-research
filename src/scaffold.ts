@@ -73,14 +73,14 @@ jobs:
         # If the framework is not reachable via npx in your setup, vendor the
         # engine bundle into the repo and use:
         #   run: node engine/continuous-research.mjs sense
-        run: npx --yes github:norabble/continuous-research#v0.1.6 sense
+        run: npx --yes github:norabble/continuous-research#v0.1.7 sense
       - name: Escalate drift
         # If the sensor wrote .research/drift/report.json (working-tree
         # only), file/refresh the single LOCKED sensor-drift issue the
         # repair workflow consumes. No report -> no-op.
         env:
           GITHUB_TOKEN: \${{ steps.app-token.outputs.token }}
-        run: npx --yes github:norabble/continuous-research#v0.1.6 escalate-drift
+        run: npx --yes github:norabble/continuous-research#v0.1.7 escalate-drift
 `;
 
 const DECLINE_WORKFLOW = `name: decline
@@ -122,7 +122,7 @@ jobs:
       - name: record-decline
         env:
           GITHUB_TOKEN: \${{ steps.app-token.outputs.token }}
-        run: npx --yes github:norabble/continuous-research#v0.1.6 record-decline
+        run: npx --yes github:norabble/continuous-research#v0.1.7 record-decline
 `;
 
 const SITE_WORKFLOW = `name: site
@@ -180,13 +180,13 @@ jobs:
       - name: build
         env:
           GITHUB_TOKEN: \${{ secrets.GITHUB_TOKEN }}
-        run: npx --yes github:norabble/continuous-research#v0.1.6 site
+        run: npx --yes github:norabble/continuous-research#v0.1.7 site
       # The OKF bundle rides the site's Pages deploy — a repo has one Pages
       # site, and this workflow owns it. Deliberately a SEPARATE step with no
       # env: okf-export reads the checkout only, so it needs no token. It is a
       # no-op (exit 0, no _okf/) unless okf.enabled is set.
       - name: build OKF bundle
-        run: npx --yes github:norabble/continuous-research#v0.1.6 okf-export
+        run: npx --yes github:norabble/continuous-research#v0.1.7 okf-export
       - name: stage OKF bundle under _site/okf
         if: hashFiles('_okf/**') != ''
         run: mkdir -p _site/okf && cp -R _okf/. _site/okf/
