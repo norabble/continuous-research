@@ -6,9 +6,22 @@ Format](https://github.com/GoogleCloudPlatform/knowledge-catalog/tree/main/okf)
 *Interop*; this page is the mechanism — the field-by-field mapping and the
 decisions that fix it.
 
-**Status:** the concept is settled; the export mechanism is staged work. This
-document is written to be the specification the implementation follows, so it
-describes the target shape, not what ships today.
+**Status.** The concept is settled and the export **ships**: `okf-export`
+renders `index.md`, `log.md`, `findings/`, and `editions/` from the instance's
+committed record ([CLI reference](./cli.md#okf-export)). Still outstanding, and
+tracked in the [backlog](./backlog.md#okf-interop) → *OKF interop*:
+
+| Family | State |
+| --- | --- |
+| `sources`, `generated` | shipped — carried by the provenance stub (`@v2`) and projected into the bundle |
+| per-claim attribution | **partial** — a finding is attributed only when its prose names a descriptor; recording the linkage explicitly is backlogged |
+| `verified` | accepted and validated by the stub, but **nothing writes it** — it needs the merge event |
+| `stale_after` | not emitted |
+| `Attested Computation` | not emitted |
+
+This document remains the specification the implementation follows, so the
+sections below describe the target shape; the table above is what to trust
+about today.
 
 ## Why OKF
 
