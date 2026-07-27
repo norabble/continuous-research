@@ -62,10 +62,13 @@ the order they were staged. Each is independently useful — none blocks another
   `btc-short-term-trend` → `btcusd-2026-06-27, btcusd-2026-07-01`;
   `engine-model-token-limits` and `google-free-flash-lite-sessions` →
   `limits-google-d1992c4c`; `copilot-free-incompatible` →
-  `limits-github-74e042c7`; `session-budget` and
-  `consumer-subscriptions-incompatible` judged by the maintainer and left
-  empty if no edition established them (an absent citation is a true
-  statement; a supplied one would not be).
+  `limits-github-74e042c7`; and `session-budget` +
+  `consumer-subscriptions-incompatible` left **empty** — settled 2026-07-27:
+  both derive from the maintainer's deployment experience rather than from any
+  source edition (`session-budget` cites framework telemetry in its own
+  prose), so no edition established them and an absent citation is the true
+  statement. They are the case the design is built for, not an oversight:
+  attribution tops out at 4 of 6 and that is the honest number.
 
 - **Verification record + freshness (`verified`, `stale_after`)** — human merge
   is already the review spine (Q-D) and is exactly what OKF means by
