@@ -12,8 +12,13 @@ import type { ResearchConfig } from "./config";
 import type { SensorRunner } from "./sensor";
 import { parseDetectionResult } from "./sensor";
 import { dedupe } from "./dedup";
+import type { ProvenanceStub } from "./provenance";
 import { buildProvenanceStub, parseProvenanceStub } from "./provenance";
 import { proposeDataPR, recordDecline } from "./flows";
+import type { DeclineRecord } from "./decline";
+import { parseDeclineRecord } from "./decline";
+import type { OkfFacts, OkfFile } from "./okf";
+import { buildOkfBundle } from "./okf";
 import { scaffoldFiles } from "./scaffold";
 import { assertDescriptor, descriptorFromLabel, provenancePathFor } from "./descriptor";
 import type { ChangedKey } from "./results";
@@ -30,6 +35,10 @@ import {
   parseDriftReport,
   planDriftEscalation,
 } from "./drift";
+
+/** Where the engine's own records live; the OKF export enumerates both. */
+const PROVENANCE_DIR = ".research/provenance";
+const DECISIONS_DIR = ".research/decisions";
 
 export type SenseOutcome =
   | { action: "none"; reason: string }
@@ -253,6 +262,61 @@ export async function runSite(deps: SiteDeps): Promise<SiteFile[] | null> {
   };
 
   return renderSite(data);
+}
+
+export interface OkfExportDeps {
+  config: ResearchConfig;
+  /** File names directly inside a directory; `[]` when it does not exist. */
+  listDir: (path: string) => Promise<string[]>;
+  /** Reads a file from the checked-out working tree. */
+  readWorkingFile: (path: string) => Promise<string>;
+  /** Used when neither `okf.title` nor `site.title` is set (CLI passes GITHUB_REPOSITORY). */
+  fallbackTitle: string;
+}
+
+/**
+ * Renders the OKF bundle from the instance's own committed record; null when
+ * the layer is off (the CLI logs and exits 0).
+ *
+ * Deliberately takes **no `GitHubPort`**: unlike the site, which surfaces *open*
+ * PRs, the bundle projects the *accepted* record — and that lives entirely on
+ * the default branch, i.e. in the checkout. So this needs no token and no
+ * network, and the bundle is reproducible offline.
+ */
+export async function runOkfExport(deps: OkfExportDeps): Promise<OkfFile[] | null> {
+  const okf = deps.config.okf;
+  if (!okf?.enabled) return null;
+
+  const editions: ProvenanceStub[] = [];
+  for (const name of await deps.listDir(PROVENANCE_DIR)) {
+    if (!name.endsWith(".json")) continue;
+    // Fail closed, as runSite does: a malformed stub is a data-integrity
+    // problem, not something to skip quietly.
+    editions.push(parseProvenanceStub(await deps.readWorkingFile(`${PROVENANCE_DIR}/${name}`)));
+  }
+
+  const declines: DeclineRecord[] = [];
+  for (const name of await deps.listDir(DECISIONS_DIR)) {
+    if (!name.endsWith(".md")) continue;
+    declines.push(parseDeclineRecord(await deps.readWorkingFile(`${DECISIONS_DIR}/${name}`)));
+  }
+
+  const findingsPath = deps.config.impact?.findings ?? "findings.md";
+  let findingsMd: string | null;
+  try {
+    findingsMd = await deps.readWorkingFile(findingsPath);
+  } catch {
+    findingsMd = null; // an instance without prose still gets a valid bundle
+  }
+
+  const facts: OkfFacts = {
+    title: okf.title ?? deps.config.site?.title ?? deps.fallbackTitle,
+    editions,
+    declines,
+    findingsMd,
+  };
+  if (okf.description !== undefined) facts.description = okf.description;
+  return buildOkfBundle(facts);
 }
 
 export interface EscalateDriftDeps {

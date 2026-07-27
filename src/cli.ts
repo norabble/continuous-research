@@ -12,10 +12,18 @@ import { createRequire } from "node:module";
 import { dirname } from "node:path";
 import { parseConfig } from "./config";
 import { helpText } from "./help";
-import { runSense, runRecordDecline, runInit, runImpact, runSite, escalateDrift } from "./commands";
+import {
+  runSense,
+  runRecordDecline,
+  runInit,
+  runImpact,
+  runSite,
+  runOkfExport,
+  escalateDrift,
+} from "./commands";
 import { NEXT_STEPS } from "./scaffold";
 import { DRIFT_REPORT_PATH } from "./drift";
-import { execSensor, readArtifact, createGitHubPortFromEnv } from "./io";
+import { execSensor, readArtifact, listDir, createGitHubPortFromEnv } from "./io";
 import { extractDeclineFromEvent } from "./event";
 
 async function writeIfAbsent(path: string, content: string): Promise<boolean> {
@@ -114,6 +122,29 @@ async function cmdSite(): Promise<number> {
   return 0;
 }
 
+async function cmdOkfExport(): Promise<number> {
+  const config = parseConfig(await readFile(".research/config.json", "utf8"));
+  // No GitHub port and no token: the bundle projects the accepted record, which
+  // is already in the checkout (CONCEPT.md -> Interop).
+  const files = await runOkfExport({
+    config,
+    listDir,
+    readWorkingFile: (path) => readFile(path, "utf8"),
+    fallbackTitle: process.env.GITHUB_REPOSITORY ?? "research",
+  });
+  if (files === null) {
+    console.log("[okf] disabled — nothing to do");
+    return 0;
+  }
+  for (const file of files) {
+    const path = `_okf/${file.path}`;
+    await mkdir(dirname(path), { recursive: true });
+    await writeFile(path, file.content);
+  }
+  console.log(`[okf] wrote ${files.length} files to _okf/`);
+  return 0;
+}
+
 async function cmdEscalateDrift(): Promise<number> {
   const github = createGitHubPortFromEnv(process.env);
   await escalateDrift({
@@ -137,6 +168,7 @@ const COMMANDS: Record<string, () => Promise<number>> = {
   "record-decline": cmdRecordDecline,
   impact: cmdImpact,
   site: cmdSite,
+  "okf-export": cmdOkfExport,
   "escalate-drift": cmdEscalateDrift,
 };
 

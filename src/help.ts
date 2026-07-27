@@ -14,6 +14,10 @@ export const CLI_COMMANDS: ReadonlyArray<{ name: string; summary: string }> = [
   },
   { name: "site", summary: "build the read-only static site into _site/" },
   {
+    name: "okf-export",
+    summary: "render the accepted record as an OKF bundle into _okf/ (opt-in)",
+  },
+  {
     name: "escalate-drift",
     summary: "file/refresh the locked sensor-drift issue from .research/drift/report.json",
   },

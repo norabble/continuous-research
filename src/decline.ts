@@ -10,6 +10,7 @@
 
 import type { Descriptor } from "./types";
 import { assertDescriptor, declinePathFor } from "./descriptor";
+import { parseDocument } from "./frontmatter";
 
 export interface DeclineInput {
   descriptor: Descriptor;
@@ -62,4 +63,54 @@ export function renderDeclineRecord(input: DeclineInput): string {
 /** Convenience: the committed file's path + rendered content. */
 export function declineFile(input: DeclineInput): { path: string; content: string } {
   return { path: declinePathFor(input.descriptor), content: renderDeclineRecord(input) };
+}
+
+/** What a committed decline record yields when read back. */
+export interface DeclineRecord {
+  descriptor: Descriptor;
+  declinedAt: string;
+  prNumber?: number;
+  declinedBy?: string;
+  /** The `## Reason` prose, or "" when the record carried none. */
+  reason: string;
+}
+
+const REASON_RE = /^##\s+Reason\s*$/m;
+
+/**
+ * Read a committed decline record back. The inverse of {@link renderDeclineRecord}
+ * — frontmatter keys are snake_case there and camelCase here, and `data_pr` is a
+ * rename rather than a case transform.
+ *
+ * Tolerant on the body (a hand-edited record still yields its metadata) and
+ * strict on the two required frontmatter fields, since those are what the
+ * evolution narrative and the OKF log are built from.
+ */
+export function parseDeclineRecord(markdown: string): DeclineRecord {
+  const { data, body } = parseDocument(markdown);
+
+  const descriptor = data.descriptor;
+  if (typeof descriptor !== "string") throw new Error('Decline "descriptor" must be a string');
+  const declinedAt = data.declined_at;
+  if (typeof declinedAt !== "string") throw new Error('Decline "declined_at" must be a string');
+
+  const record: DeclineRecord = {
+    descriptor: assertDescriptor(descriptor),
+    declinedAt: requireIsoDate(declinedAt),
+    reason: "",
+  };
+
+  if (data.data_pr !== undefined) {
+    if (typeof data.data_pr !== "number") throw new Error('Decline "data_pr" must be a number');
+    record.prNumber = data.data_pr;
+  }
+  if (data.declined_by !== undefined) {
+    if (typeof data.declined_by !== "string")
+      throw new Error('Decline "declined_by" must be a string');
+    record.declinedBy = data.declined_by;
+  }
+
+  const match = REASON_RE.exec(body);
+  if (match !== null) record.reason = body.slice(match.index + match[0].length).trim();
+  return record;
 }

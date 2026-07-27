@@ -1,5 +1,6 @@
 node_modules/
 dist/
+bundle/
 coverage/
 package-lock.json
 # Claude Code machine-specific files (device nodes in WSL)
