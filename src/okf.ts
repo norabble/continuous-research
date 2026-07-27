@@ -176,7 +176,13 @@ function editionDoc(stub: ProvenanceStub): OkfFile {
 
 function findingDoc(section: FindingSection, byDescriptor: Map<string, ProvenanceStub>): OkfFile {
   const { annotation, title, prose } = section;
-  const cited = citedEditions(prose, new Set(byDescriptor.keys()));
+  const known = new Set(byDescriptor.keys());
+  // Recorded beats inferred: an `editions:` field was written by the step that
+  // knew the answer, so it wins outright. The prose scan is the legacy path,
+  // for claims annotated before the field existed. An entry we hold no stub for
+  // is dropped here and reported by the linter, which is where that belongs.
+  const recorded = annotation.editions.filter((d) => known.has(d));
+  const cited = recorded.length > 0 ? recorded : citedEditions(prose, known);
 
   const data: FrontmatterData = {
     type: "Finding",

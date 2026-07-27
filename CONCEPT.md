@@ -328,8 +328,14 @@ Prose stays canonical. The claim↔result link rides **inline in the prose** as 
 invisible annotation — single source of truth, grep-able, accretive:
 
 ```
-<!-- claim: sector-redistribution-signal | backs: dynamic_sector_corr_economywide | status: supported -->
+<!-- claim: sector-redistribution-signal | backs: dynamic_sector_corr_economywide | status: supported | editions: sectors-2026-07-01 -->
 ```
+
+`editions:` is **optional** and lists, oldest first, the editions that have
+revised the claim — the same *capture at the moment of knowledge* rule the
+provenance stub follows (Q-F), applied to attribution. It is append-only, and
+the interpretation step may record only the edition it was triggered by; a
+guessed citation is worse than an absent one.
 
 End-to-end: diff `results.json` → for each changed key, `grep` the prose for
 `backs:.*<key>` → the agent re-examines exactly those passages and writes the

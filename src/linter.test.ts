@@ -39,6 +39,32 @@ describe("lintConsistency", () => {
     expect(out.some((f) => f.message.includes("malformed"))).toBe(true);
   });
 
+  it("flags an editions entry that is not an accepted edition", () => {
+    const index = parseAnnotations(
+      "<!-- claim: c | backs: close | status: supported | editions: limits-github-74e042c7, typo-here -->",
+    );
+    const out = lintConsistency({
+      results: { close: 1 },
+      index,
+      changed: [],
+      knownEditions: ["limits-github-74e042c7"],
+    });
+    expect(out).toEqual([
+      {
+        level: "error",
+        claimId: "c",
+        message: 'editions entry "typo-here" is not an accepted edition',
+      },
+    ]);
+  });
+
+  it("skips the editions rule entirely when knownEditions is not supplied", () => {
+    const index = parseAnnotations(
+      "<!-- claim: c | backs: close | status: supported | editions: anything-at-all -->",
+    );
+    expect(lintConsistency({ results: { close: 1 }, index, changed: [] })).toEqual([]);
+  });
+
   it("warns when a claim's backing changed but its status was not touched", () => {
     const priorIndex = parseAnnotations("<!-- claim: c | backs: close | status: supported -->");
     const index = parseAnnotations("<!-- claim: c | backs: close | status: supported -->");

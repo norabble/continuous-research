@@ -6,9 +6,22 @@ Format](https://github.com/GoogleCloudPlatform/knowledge-catalog/tree/main/okf)
 *Interop*; this page is the mechanism — the field-by-field mapping and the
 decisions that fix it.
 
-**Status:** the concept is settled; the export mechanism is staged work. This
-document is written to be the specification the implementation follows, so it
-describes the target shape, not what ships today.
+**Status.** The concept is settled and the export **ships**: `okf-export`
+renders `index.md`, `log.md`, `findings/`, and `editions/` from the instance's
+committed record ([CLI reference](./cli.md#okf-export)). Still outstanding, and
+tracked in the [backlog](./backlog.md#okf-interop) → *OKF interop*:
+
+| Family | State |
+| --- | --- |
+| `sources`, `generated` | shipped — carried by the provenance stub (`@v2`) and projected into the bundle |
+| per-claim attribution | shipped — the annotation's optional `editions:` field, preferred over the legacy prose scan |
+| `verified` | accepted and validated by the stub, but **nothing writes it** — it needs the merge event |
+| `stale_after` | not emitted |
+| `Attested Computation` | not emitted |
+
+This document remains the specification the implementation follows, so the
+sections below describe the target shape; the table above is what to trust
+about today.
 
 ## Why OKF
 
@@ -60,7 +73,7 @@ _okf/
 | `verified: [{by, at}]` | the human data-PR merge | the **verification record**; written at merge, not derived at export |
 | `status` — `draft` / `stable` / `deprecated` | **name collision only** — claim `status` is `supported` / `weakened` / `overturned` / `open` | different axes; see *Decision 2* |
 | `stale_after` | *nothing*; drift detection is adjacent | derived from config, absent when unset |
-| `[^source-id]` footnotes | the inline claim annotation's `backs` | per-claim attribution; see *Decision 6* |
+| `[^source-id]` footnotes | the inline claim annotation's `editions` | per-claim attribution; `backs` is separate — see *Decisions 6 and 7* |
 | `log.md` — newest-first `## YYYY-MM-DD` | the edition / decline stream | the evolution narrative, in a portable shape |
 | `index.md` + `okf_version` | *nothing* | bundle root only |
 | `type: Attested Computation` | the sensor contract | `receipt` **is** the detection result; the hash check **is** the attester |
@@ -116,8 +129,17 @@ emitted **only** from a real merge or decline event, never from configuration.
 6. **`backs` is not a source list.** The inline annotation's `backs` names
    whatever the claim rests on — `results.json` keys (`close, ma7`), dotted
    source keys, or literally `(prose)`. It is emitted verbatim as a custom
-   `backs` key. `sources[]` is derived separately, from the editions the claim's
-   prose cites.
+   `backs` key. `sources[]` comes from the annotation's separate `editions:`
+   field.
+
+7. **Attribution is recorded, not inferred.** `editions:` is written by the
+   step that knew the answer — the interpretation agent, which takes its
+   descriptor from the PR's `data:` label and may record *only* that one. The
+   linter rejects an entry naming no accepted edition. Where the field is
+   absent the export falls back to scanning the prose for backticked
+   descriptors, which is how claims annotated before the field are attributed;
+   there is no third fallback, and a claim with neither signal gets no
+   `sources` key at all.
 
 ## Divergences from OKF
 

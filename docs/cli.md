@@ -179,7 +179,9 @@ default branch via the API).
    `impact.resultsPath` (with `${descriptor}` substituted) and parse the
    claim annotations from the findings file (`impact.findings`, default
    `findings.md`; grammar: `<!-- claim: <id> | backs: <keys> | status:
-   <status> -->` — see the [Phase-2 plan](./phase-2-plan.md)).
+   <status> [| editions: <descriptors>] -->` — see the [Phase-2
+   plan](./phase-2-plan.md)). The optional `editions:` field names the
+   editions that revised the claim; it is what the OKF export cites.
 2. With `--against <prior>`: read the **prior** edition's `results.json`
    from the **default branch** and diff — the changed keys, as dotted leaf
    paths. **Fail-closed:** a named baseline with no committed results is an
@@ -187,7 +189,10 @@ default branch via the API).
 3. Select the **affected claims** — those whose `backs:` key changed
    (segment-boundary matching, so `close` never matches `close_vs_ma7_pct`).
 4. Run the **consistency-linter** (advisory findings, never a merge gate;
-   skipped if `impact.linter` is `false`).
+   skipped if `impact.linter` is `false`). It also rejects an `editions:`
+   entry that names no accepted edition — the descriptors are read from
+   `.research/provenance/` in the working tree, which on a data-PR already
+   includes the incoming stub.
 5. Write `.research/impact/<descriptor>.impact.json`:
    `{ edition, baseline, changed, affected, lint }` — the cheap, exact
    "which claims to re-examine" the interpretation agent is fed.

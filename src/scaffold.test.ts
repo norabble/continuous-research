@@ -120,8 +120,22 @@ describe("scaffoldFiles", () => {
     expect(interp).toContain("your-app-slug");
     // The annotation example must be a fenced block, NOT an HTML comment —
     // the gh-aw prompt renderer strips HTML comments even inside code spans.
-    expect(interp).toContain("claim: <id> | backs: <result keys> | status: <status>");
+    expect(interp).toContain(
+      "claim: <id> | backs: <result keys> | status: <status> | editions: <descriptors>",
+    );
     expect(interp).not.toContain("<!--");
+  });
+
+  it("lets the interpretation step record only the edition it was triggered by", () => {
+    // The whole safety argument for agent-written linkage: the descriptor comes
+    // from the data: label, so this is capture, not judgment.
+    const interp = byPath(".github/workflows/interpretation.md");
+    expect(interp).toContain("and **only** that one");
+    expect(interp).toContain("Never name any other edition and never remove one");
+    // Comment resolution is triggered by a reviewer, so it is entitled to none.
+    const resolve = byPath(".github/workflows/comment-resolution.md");
+    expect(resolve).toContain("leave each annotation's");
+    expect(resolve).toContain("there is no edition you are entitled to");
   });
 
   it("pins every action reference to a full commit SHA", () => {

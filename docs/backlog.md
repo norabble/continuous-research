@@ -42,6 +42,61 @@ Deferred items, none scheduled. Each entry says why it matters and what
   surface the revised-claim section first), and the sample's next edition
   demonstrates it.
 
+## OKF interop
+
+The concept is settled (CONCEPT.md → *Interop*, Q-F) and the mapping is
+specified in [`okf-interop.md`](./okf-interop.md). The export mechanism
+(`okf-export`) and per-claim attribution both ship; these are what is left, in
+the order they were staged. Each is independently useful — none blocks another.
+
+- **Backfill `editions:` on the six existing claims** — the annotation's
+  optional `editions:` field ships (parser, linter rule, export, prompts), but
+  it only fills in going forward: the agent appends the edition it was
+  triggered by, so a claim gets attributed the next time an edition revises
+  it. The six claims already written across both instances carry nothing, and
+  token-source-review's prose names no descriptor, so it stays at **0 of 5**
+  attributed until they are filled in by hand. **Sequencing is binding:** an
+  engine older than the field's release parses a 4-field annotation with the
+  extra field absorbed into `status`, so both instances must be pinned to a
+  release carrying the fix *before* any prose gains the field. Done =
+  `btc-short-term-trend` → `btcusd-2026-06-27, btcusd-2026-07-01`;
+  `engine-model-token-limits` and `google-free-flash-lite-sessions` →
+  `limits-google-d1992c4c`; `copilot-free-incompatible` →
+  `limits-github-74e042c7`; `session-budget` and
+  `consumer-subscriptions-incompatible` judged by the maintainer and left
+  empty if no edition established them (an absent citation is a true
+  statement; a supplied one would not be).
+
+- **Verification record + freshness (`verified`, `stale_after`)** — human merge
+  is already the review spine (Q-D) and is exactly what OKF means by
+  *verified*, so instances have been producing human-reviewed knowledge with no
+  portable way to say so. `provenance@v2` accepts and validates `verified`, but
+  **nothing writes it**: it needs the merge event. Record it durably at merge
+  rather than deriving it at export time — a bundle whose trust tier depends on
+  whether the exporter happened to hold a token is worse than one with no tier
+  at all, and deriving it would also cost `okf-export` its no-token, offline
+  property. Note the symmetry: the decline record captures rejection, this
+  captures acceptance; the loop has only ever recorded half.
+  Done = `recordVerification` in `src/flows.ts` mirroring `recordDecline`
+  (commit to the default branch, `verify(<descriptor>): record merge`), a
+  `record-verification` command, a scaffolded `merged.yml` symmetric with
+  `decline.yml`, and a **new port read for merge metadata** — do *not* widen
+  `PullRequest` in `src/types.ts`, which is deliberately `{number, state,
+  labels}` to keep the dedup classifier pure. `stale_after` rides along from a
+  config-set staleness window, omitted entirely when unset.
+
+- **Sensor as an `Attested Computation`** — the sensor contract already has the
+  shape OKF's attestation model describes: a declared `runtime`, an `executor`,
+  a `receipt` (the detection result), and a deterministic attester (the content
+  hash that already guards against silent source drift). Mostly emission plus a
+  written attester description; little new logic. State the divergence rather
+  than papering over it (already noted in `okf-interop.md`): OKF assumes a
+  parameterized computation whose parameters an agent binds, and CR sensors take
+  no parameters and no agent touches them — CR is the degenerate, stricter case.
+  Done = `computations/sensor.md` emitted into the bundle from `config.sensor`
+  plus the detection-result contract, and an attester description committed
+  under `.research/`.
+
 ## Security hardening (release/distribution)
 
 - **Tag ruleset on `v*`** — tags are the trust anchor for `npx github:…#vX`

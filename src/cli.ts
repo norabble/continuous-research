@@ -87,6 +87,7 @@ async function cmdImpact(): Promise<number> {
     config,
     port,
     readWorkingFile: (path) => readFile(path, "utf8"),
+    listDir,
     descriptor,
     against,
   });

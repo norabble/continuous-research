@@ -19,6 +19,12 @@ export interface LintInput {
   index: ClaimIndex;
   changed: ChangedKey[];
   priorIndex?: ClaimIndex;
+  /**
+   * Descriptors of the accepted editions, for checking annotations' `editions:`
+   * field. Injected (design rule 1) — absent ⇒ the rule is skipped entirely, so
+   * a caller with no cheap way to enumerate editions loses nothing else.
+   */
+  knownEditions?: string[];
 }
 
 const resolves = (backsKey: string, keys: string[]): boolean =>
@@ -44,6 +50,24 @@ export function lintConsistency(input: LintInput): LintFinding[] {
           claimId: a.claimId,
           message: `backs key "${b}" not found in results.json`,
         });
+      }
+    }
+  }
+
+  // The only automated defence against a mistyped or invented descriptor. A
+  // wrong citation is worse than an absent one (trust honesty), and nothing
+  // downstream can tell the two apart — the export just believes the field.
+  if (input.knownEditions !== undefined) {
+    const known = new Set(input.knownEditions);
+    for (const a of input.index.byId.values()) {
+      for (const d of a.editions) {
+        if (!known.has(d)) {
+          findings.push({
+            level: "error",
+            claimId: a.claimId,
+            message: `editions entry "${d}" is not an accepted edition`,
+          });
+        }
       }
     }
   }

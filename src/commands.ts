@@ -20,7 +20,12 @@ import { parseDeclineRecord } from "./decline";
 import type { OkfFacts, OkfFile } from "./okf";
 import { buildOkfBundle } from "./okf";
 import { scaffoldFiles } from "./scaffold";
-import { assertDescriptor, descriptorFromLabel, provenancePathFor } from "./descriptor";
+import {
+  assertDescriptor,
+  descriptorFromLabel,
+  isValidDescriptor,
+  provenancePathFor,
+} from "./descriptor";
 import type { ChangedKey } from "./results";
 import { diffResults, resolveResultsPath } from "./results";
 import { parseAnnotations, type ClaimIndex } from "./annotations";
@@ -133,6 +138,8 @@ export interface ImpactDeps {
   port: GitHubPort;
   /** Reads a file from the PR working tree (the checked-out branch). */
   readWorkingFile: (path: string) => Promise<string>;
+  /** Lists a directory in the working tree; supplies the linter's accepted-edition set. */
+  listDir: (path: string) => Promise<string[]>;
   descriptor: string;
   /** The prior merged edition to diff against; absent ⇒ first edition. */
   against?: string;
@@ -178,8 +185,18 @@ export async function runImpact(deps: ImpactDeps): Promise<ImpactArtifact> {
     backs: a.backs,
     status: a.status,
   }));
+  // Impact runs on the PR branch checkout, which carries the incoming stub — so
+  // the triggering descriptor is already "accepted" for lint purposes on the
+  // very PR that introduces it.
+  const knownEditions = (await deps.listDir(PROVENANCE_DIR))
+    .filter((name) => name.endsWith(".json"))
+    .map((name) => name.slice(0, -".json".length))
+    .filter(isValidDescriptor);
+
   const lint =
-    impact.linter === false ? [] : lintConsistency({ results: next, index, changed, priorIndex });
+    impact.linter === false
+      ? []
+      : lintConsistency({ results: next, index, changed, priorIndex, knownEditions });
 
   return { edition: deps.descriptor, baseline, changed, affected, lint };
 }
