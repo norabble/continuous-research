@@ -234,6 +234,7 @@ describe("runImpact", () => {
         config: { sensor: "x" },
         port: portWith({}),
         readWorkingFile: () => Promise.resolve("{}"),
+        listDir: () => Promise.resolve([]),
         descriptor: "btcusd-2026-07-01",
       }),
     ).rejects.toThrow(/impact layer/);
@@ -245,6 +246,7 @@ describe("runImpact", () => {
       port: portWith({}),
       readWorkingFile: (p) =>
         Promise.resolve(p === "findings.md" ? findings : JSON.stringify({ close: 100 })),
+      listDir: () => Promise.resolve([]),
       descriptor: "btcusd-2026-07-01",
     });
     expect(out.baseline).toBeNull();
@@ -267,6 +269,7 @@ describe("runImpact", () => {
       }),
       readWorkingFile: (p) =>
         Promise.resolve(p === "findings.md" ? findings : JSON.stringify({ close: 100 })),
+      listDir: () => Promise.resolve([]),
       descriptor: "btcusd-2026-07-01",
       against: "btcusd-2026-06-30",
     });
@@ -289,10 +292,39 @@ describe("runImpact", () => {
         port: portWith({ readFileFromRef: () => Promise.resolve(null) }),
         readWorkingFile: (p) =>
           Promise.resolve(p === "findings.md" ? findings : JSON.stringify({ close: 100 })),
+        listDir: () => Promise.resolve([]),
         descriptor: "btcusd-2026-07-01",
         against: "btcusd-2026-06-30",
       }),
     ).rejects.toThrow(/btcusd-2026-06-30/);
+  });
+
+  it("derives the linter's accepted editions from the provenance directory", async () => {
+    const listed: string[] = [];
+    const out = await runImpact({
+      config,
+      port: portWith({}),
+      readWorkingFile: (p) =>
+        Promise.resolve(
+          p === "findings.md"
+            ? "<!-- claim: trend | backs: close | status: supported | editions: btcusd-2026-07-01, ghost-1 -->\n"
+            : JSON.stringify({ close: 100 }),
+        ),
+      listDir: (path) => {
+        listed.push(path);
+        // The incoming stub rides the PR branch, so it is already listed here.
+        return Promise.resolve(["btcusd-2026-07-01.json", "notes.txt", "../evil.json"]);
+      },
+      descriptor: "btcusd-2026-07-01",
+    });
+    expect(listed).toEqual([".research/provenance"]);
+    expect(out.lint).toEqual([
+      {
+        level: "error",
+        claimId: "trend",
+        message: 'editions entry "ghost-1" is not an accepted edition',
+      },
+    ]);
   });
 
   it("rejects an invalid descriptor before touching the filesystem", async () => {
@@ -301,6 +333,7 @@ describe("runImpact", () => {
         config,
         port: portWith({}),
         readWorkingFile: () => Promise.resolve("{}"),
+        listDir: () => Promise.resolve([]),
         descriptor: "../evil",
       }),
     ).rejects.toThrow(/Invalid descriptor/);

@@ -448,8 +448,11 @@ Check out the PR's branch. Read:
    line in the file is wrapped as an HTML comment):
 
    \`\`\`text
-   claim: <id> | backs: <result keys> | status: <status>
+   claim: <id> | backs: <result keys> | status: <status> | editions: <descriptors>
    \`\`\`
+
+   The \`editions:\` field is **optional** and may be absent — it lists, oldest
+   first, the editions that have revised this claim.
 
 ## Write
 
@@ -464,7 +467,13 @@ On the PR branch, make exactly two changes:
    - **Revised claim** — the new claim text.
 2. **Update \`findings.md\`** — replace the claim paragraph with the revised
    claim (keep the same claim id in the annotation; update the values, the
-   edition reference, and the \`status\` field as assessed).
+   edition reference, and the \`status\` field as assessed). For each claim you
+   revise, append **\`<descriptor>\`** — the descriptor from this PR's
+   \`data:\` label, and **only** that one — to that annotation's \`editions:\`
+   list, adding the field if it is absent. Keep every entry already there.
+   Never name any other edition and never remove one: this field is a citation
+   consumers trust, so recording the edition you were given is right and
+   guessing at any other is not.
 
 Keep the tone factual and appropriately hedged. Commit both files to the PR
 branch with the message \`interpretation(<descriptor>): impact declaration\`.
@@ -523,7 +532,10 @@ TODO: describe where this project's edition artifacts live.
 
 - If the request concerns \`.research/impact/<descriptor>.md\` or
   \`findings.md\`: make the requested change on the PR branch, keeping the
-  claim annotation format intact, commit with the message
+  claim annotation format intact — in particular, leave each annotation's
+  \`editions:\` field exactly as you found it. You were triggered by a
+  reviewer, not by an edition, so there is no edition you are entitled to
+  add. Commit with the message
   \`resolve(<descriptor>): <short summary>\`, and push via
   push_to_pull_request_branch.
 - If the request is outside those two files, or asks for something factually

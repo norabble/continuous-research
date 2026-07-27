@@ -46,40 +46,26 @@ Deferred items, none scheduled. Each entry says why it matters and what
 
 The concept is settled (CONCEPT.md → *Interop*, Q-F) and the mapping is
 specified in [`okf-interop.md`](./okf-interop.md). The export mechanism
-(`okf-export`) ships; these are the remaining families, in the order they were
-staged. Each is independently useful — none blocks another.
+(`okf-export`) and per-claim attribution both ship; these are what is left, in
+the order they were staged. Each is independently useful — none blocks another.
 
-- **Claim → edition linkage: record it instead of inferring it** — an OKF
-  `Finding` wants `sources`, but nothing in the loop records which editions
-  back a claim: the inline annotation's `backs` points at *result keys*, not
-  editions. The export therefore attributes a finding **only** when its prose
-  names a descriptor in backticks, and emits no `sources` key otherwise. That
-  is honest but thin: on 2026-07-25 it attributed 1 of 1 findings in the sample
-  and **0 of 5** in token-source-review, whose prose names no descriptor and
-  three of whose claims say `backs: (prose)`. TSR's keys *do* correspond to
-  editions (`google.…` → `limits-google-…`) but only via a project-defined
-  descriptor scheme the framework must not know, so the framework cannot
-  derive it — and a "nearest edition" fallback was rejected outright: it would
-  have attributed the Copilot claim to whichever edition was newest, and a
-  fabricated citation travels into consumers that treat it as fact (Q-F:
-  *assert only what the loop establishes*).
-  The fix is Q-F's *capture at the moment of knowledge*, applied the way
-  `provenance@v2` applied it — an optional fourth field in the annotation:
-  `<!-- claim: x | backs: … | status: … | editions: limits-github-74e042c7 -->`.
-  **The asymmetry that makes this its own item, not a footnote:** `generated`
-  was safe to capture because the *sensor* knows it mechanically; linkage is a
-  **judgment an LLM makes**, so it introduces a failure mode the stub never
-  had — a *confidently wrong* citation. A linter can catch "unknown
-  descriptor"; nothing catches "wrong descriptor", and under the trust-honesty
-  rule a wrong citation is worse than an absent one. Settle first whether the
-  agent writes the field at all or it stays human-and-linter-only.
-  Done = the optional field parsed **tolerantly** in `src/annotations.ts` (its
-  regex is a strict 3-field match today, so a 4-field annotation currently
-  reads as *malformed* — older engines must not choke on newer prose), a
-  linter rule rejecting unknown descriptors, the export preferring it over the
-  prose scan, updated interpretation / comment-resolution prompts in
-  `src/scaffold.ts` (instances then re-run `gh aw compile`), and the six
-  existing claims across both instances backfilled.
+- **Backfill `editions:` on the six existing claims** — the annotation's
+  optional `editions:` field ships (parser, linter rule, export, prompts), but
+  it only fills in going forward: the agent appends the edition it was
+  triggered by, so a claim gets attributed the next time an edition revises
+  it. The six claims already written across both instances carry nothing, and
+  token-source-review's prose names no descriptor, so it stays at **0 of 5**
+  attributed until they are filled in by hand. **Sequencing is binding:** an
+  engine older than the field's release parses a 4-field annotation with the
+  extra field absorbed into `status`, so both instances must be pinned to a
+  release carrying the fix *before* any prose gains the field. Done =
+  `btc-short-term-trend` → `btcusd-2026-06-27, btcusd-2026-07-01`;
+  `engine-model-token-limits` and `google-free-flash-lite-sessions` →
+  `limits-google-d1992c4c`; `copilot-free-incompatible` →
+  `limits-github-74e042c7`; `session-budget` and
+  `consumer-subscriptions-incompatible` judged by the maintainer and left
+  empty if no edition established them (an absent citation is a true
+  statement; a supplied one would not be).
 
 - **Verification record + freshness (`verified`, `stale_after`)** — human merge
   is already the review spine (Q-D) and is exactly what OKF means by

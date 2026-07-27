@@ -121,6 +121,59 @@ describe("citation honesty", () => {
   });
 });
 
+// Stage 2b: linkage is recorded by the step that knew it, not inferred later.
+describe("recorded linkage", () => {
+  const withEditions = (annotation: string) =>
+    TSR_FINDINGS.replace(
+      "<!-- claim: copilot-free-incompatible | backs: github.free.model-selection | status: supported -->",
+      annotation,
+    );
+
+  const sourcesOf = (findingsMd: string, claim: string) => {
+    const files = buildOkfBundle({ ...base, editions: [btc, older], findingsMd });
+    const doc = files.find((f) => f.path === `findings/${claim}.md`);
+    expect(doc, claim).toBeDefined();
+    return parseDocument(doc?.content ?? "").data;
+  };
+
+  it("attributes a claim whose prose names nothing, once the field is recorded", () => {
+    // The exact gap Stage 2 measured: 0 of 5 attributed in token-source-review.
+    const data = sourcesOf(
+      withEditions(
+        "<!-- claim: copilot-free-incompatible | backs: github.free.model-selection | status: supported | editions: btcusd-2026-06-27 -->",
+      ),
+      "copilot-free-incompatible",
+    );
+    expect(data.sources).toEqual([
+      { id: "btcusd-2026-06-27", resource: "https://api.exchange/older" },
+    ]);
+  });
+
+  it("prefers the recorded field over a prose scan that would say otherwise", () => {
+    const findingsMd = SAMPLE_FINDINGS.replace(
+      "<!-- claim: btc-short-term-trend | backs: close, ma7 | status: supported -->",
+      "<!-- claim: btc-short-term-trend | backs: close, ma7 | status: supported | editions: btcusd-2026-06-27 -->",
+    );
+    // The prose still backticks btcusd-2026-07-01; the record wins outright.
+    const data = sourcesOf(findingsMd, "btc-short-term-trend");
+    expect(data.sources).toEqual([
+      { id: "btcusd-2026-06-27", resource: "https://api.exchange/older" },
+    ]);
+  });
+
+  it("drops an entry naming an edition with no stub, and falls back when none survive", () => {
+    const data = sourcesOf(
+      withEditions(
+        "<!-- claim: copilot-free-incompatible | backs: github.free.model-selection | status: supported | editions: never-merged-1 -->",
+      ),
+      "copilot-free-incompatible",
+    );
+    // The linter reports the unknown descriptor; the offline exporter must not
+    // publish a citation it cannot resolve.
+    expect(data).not.toHaveProperty("sources");
+  });
+});
+
 describe("buildOkfBundle", () => {
   it("emits index, log, one finding per claim, one edition per stub", () => {
     const files = buildOkfBundle({ ...base, editions: [btc, older], findingsMd: SAMPLE_FINDINGS });
