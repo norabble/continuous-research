@@ -166,4 +166,17 @@ describe("scaffoldFiles", () => {
     expect(site).not.toContain("upload-pages-artifact");
     expect(site).toContain("name: github-pages");
   });
+
+  it("site never cancels a deploy already in flight", () => {
+    // Merging a data-PR fires `push` and `pull_request_target: closed`
+    // together. They share the `site` concurrency group, so a cancelling
+    // group lets the closed run — which only refreshes the pending list —
+    // kill the push run, which is the one that actually deploys. Observed
+    // 2026-07-27: the github-pages deployment went straight to `error` and
+    // the site stayed on its previous build.
+    const site = fileContent(".github/workflows/site.yml");
+    expect(site).toContain("group: site");
+    expect(site).toContain("cancel-in-progress: false");
+    expect(site).not.toContain("cancel-in-progress: true");
+  });
 });
