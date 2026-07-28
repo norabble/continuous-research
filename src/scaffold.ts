@@ -156,9 +156,16 @@ permissions:
   pages: write
   id-token: write
 
+# One deployment at a time, but never cancel one that is already running —
+# this matches GitHub's own Pages guidance, and cancelling is actively wrong
+# here. Merging a data-PR fires 'push' and 'pull_request_target: closed'
+# together: the push run is the one that deploys, the closed run only
+# refreshes the pending list. Sharing a cancelling group let the closed run
+# kill the deploy mid-flight, leaving the github-pages deployment in 'error'
+# and the site stale at its previous build.
 concurrency:
   group: site
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   build-deploy:
