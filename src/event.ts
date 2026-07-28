@@ -4,11 +4,16 @@
  * decision 3). Each returns null when the event should *not* produce its record
  * — the two are exact complements on `merged` — so either command can no-op
  * safely even if the workflow `if:` lets it through.
+ *
+ * The payload is GitHub's, so its keys are snake_case (`merged_by`,
+ * `closed_at`); the inputs these produce are ours and are camelCase
+ * (`mergedBy`, `declinedAt`). Translating at this boundary is the point of the
+ * module — nothing downstream should have to know the payload's shape.
  */
 
 import type { Descriptor } from "./types";
 import { descriptorFromLabel } from "./descriptor";
-import { actorForLogin } from "./provenance";
+import { actorForUser } from "./provenance";
 
 export interface DeclineEventInputs {
   descriptor: Descriptor;
@@ -40,6 +45,18 @@ function senderLogin(sender: unknown): string | undefined {
     return typeof sender.login === "string" ? sender.login : undefined;
   }
   return undefined;
+}
+
+/**
+ * An event's user object (`{login, type}`) as an OKF actor, or undefined when
+ * the payload names nobody. `type` is GitHub's own answer to "is this a bot",
+ * which is why it is read here rather than guessed from the login downstream.
+ */
+function userActor(value: unknown): string | undefined {
+  if (typeof value !== "object" || value === null) return undefined;
+  const o = value as Record<string, unknown>;
+  if (typeof o.login !== "string") return undefined;
+  return actorForUser(o.login, o.type === "Bot");
 }
 
 export interface VerificationEventInputs {
@@ -75,8 +92,8 @@ export function extractVerificationFromEvent(event: unknown): VerificationEventI
 
   // `merged_by` is the merge's own actor; `sender` is the fallback for a payload
   // that omits it (both are GitHub-authored, neither is PR-author controlled).
-  const login = senderLogin(p.merged_by) ?? senderLogin((event as Record<string, unknown>).sender);
-  if (login === undefined) {
+  const mergedBy = userActor(p.merged_by) ?? userActor((event as Record<string, unknown>).sender);
+  if (mergedBy === undefined) {
     throw new Error(`Merged data-PR #${p.number} names no merging actor; refusing to attest it`);
   }
 
@@ -84,7 +101,7 @@ export function extractVerificationFromEvent(event: unknown): VerificationEventI
     descriptor,
     prNumber: p.number,
     mergedAt: typeof p.merged_at === "string" ? p.merged_at : new Date().toISOString(),
-    mergedBy: actorForLogin(login),
+    mergedBy,
   };
 }
 

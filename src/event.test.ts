@@ -82,12 +82,25 @@ describe("extractVerificationFromEvent", () => {
 
   // An auto-merge is a machine confirmation. Emitting `human:` for it would hand
   // the bundle OKF's human-reviewed tier on the strength of nobody's judgment.
+  const mergedByUser = (user: Record<string, unknown>) => ({
+    ...merged,
+    pull_request: { ...merged.pull_request, merged_by: user as unknown as { login: string } },
+  });
+
   it("attests a bot merge as a process, never as a human", () => {
-    const byBot = {
-      ...merged,
-      pull_request: { ...merged.pull_request, merged_by: { login: "dependabot[bot]" } },
-    };
-    expect(extractVerificationFromEvent(byBot)?.mergedBy).toBe("process:dependabot");
+    expect(extractVerificationFromEvent(mergedByUser({ login: "dependabot[bot]" }))?.mergedBy).toBe(
+      "process:dependabot",
+    );
+  });
+
+  // `type` is GitHub's own answer, and it holds where the login gives nothing away.
+  it("reads the payload's type field, not just the login suffix", () => {
+    expect(
+      extractVerificationFromEvent(mergedByUser({ login: "some-service", type: "Bot" }))?.mergedBy,
+    ).toBe("process:some-service");
+    expect(
+      extractVerificationFromEvent(mergedByUser({ login: "rbaker5", type: "User" }))?.mergedBy,
+    ).toBe("human:rbaker5");
   });
 
   it("falls back to the event sender when merged_by is absent", () => {

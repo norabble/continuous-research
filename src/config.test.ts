@@ -59,7 +59,7 @@ describe("parseConfig — site block", () => {
     expect(parseConfig('{"sensor":"x"}').site).toBeUndefined();
   });
 
-  it("parses the optional okf freshness window", () => {
+  it("parses the optional OKF freshness window", () => {
     expect(parseConfig('{"sensor":"x","okf":{"enabled":true,"staleAfterDays":30}}').okf).toEqual({
       enabled: true,
       staleAfterDays: 30,

@@ -351,15 +351,29 @@ describe("the sensor as an Attested Computation", () => {
 });
 
 // docs/okf-interop.md → Conformance. OKF ships no validator, so we assert our own.
-describe("conformance", () => {
-  const files = buildOkfBundle({
+//
+// Run over both shapes: OKF mandates no particular concepts, so a bundle with
+// no computations and no freshness window must be exactly as conformant as one
+// carrying everything. That is what makes those fields safely optional.
+const CONFORMANCE_CASES = {
+  "every family present": {
     ...base,
     editions: [btc, older],
     declines: [{ descriptor: "d9", declinedAt: "2026-06-29T00:00:00Z", reason: "no" }],
     findingsMd: SAMPLE_FINDINGS,
     sensor: { command: "node sensor.mjs", attester: null },
     staleAfterDays: 30,
-  });
+  },
+  "no sensor, no freshness window": {
+    ...base,
+    editions: [btc, older],
+    declines: [{ descriptor: "d9", declinedAt: "2026-06-29T00:00:00Z", reason: "no" }],
+    findingsMd: SAMPLE_FINDINGS,
+  },
+} satisfies Record<string, OkfFacts>;
+
+describe.each(Object.entries(CONFORMANCE_CASES))("conformance — %s", (_name, facts) => {
+  const files = buildOkfBundle(facts);
 
   it("gives every non-reserved document a non-empty type", () => {
     for (const file of files) {

@@ -6,7 +6,7 @@ import {
   parseProvenanceStub,
   primarySource,
   provenanceFile,
-  actorForLogin,
+  actorForUser,
   withVerification,
   PROVENANCE_SCHEMA,
   PROVENANCE_SCHEMA_V1,
@@ -246,19 +246,32 @@ describe("provenanceFile", () => {
   });
 });
 
-describe("actorForLogin", () => {
-  it("maps a person to human: and a bot to process:", () => {
-    expect(actorForLogin("rbaker5")).toBe("human:rbaker5");
-    expect(actorForLogin("continuous-research-bot[bot]")).toBe("process:continuous-research-bot");
+describe("actorForUser", () => {
+  it("maps a person to human: and an App identity to process:", () => {
+    expect(actorForUser("rbaker5")).toBe("human:rbaker5");
+    expect(actorForUser("continuous-research-bot[bot]")).toBe("process:continuous-research-bot");
+  });
+
+  // GitHub's `type` field is the authoritative signal; the login suffix is the
+  // fallback. Either alone must be enough — inflating a trust tier is the one
+  // outcome that must not be reachable.
+  it("honours the type flag even when the login carries no suffix", () => {
+    expect(actorForUser("some-service", true)).toBe("process:some-service");
+    expect(actorForUser("some-service", false)).toBe("human:some-service");
+  });
+
+  it("matches the suffix case-insensitively, with or without the flag", () => {
+    expect(actorForUser("Weird[BOT]")).toBe("process:Weird");
+    expect(actorForUser("Weird[Bot]", false)).toBe("process:Weird");
   });
 
   it("produces actors the stub validator accepts", () => {
     for (const login of ["rbaker5", "some-bot[bot]", "a1"]) {
       const stub = buildProvenanceStub({
         ...valid,
-        verified: [{ by: actorForLogin(login), at: "2026-07-28T00:00:00Z" }],
+        verified: [{ by: actorForUser(login), at: "2026-07-28T00:00:00Z" }],
       });
-      expect(stub.verified?.[0]?.by).toBe(actorForLogin(login));
+      expect(stub.verified?.[0]?.by).toBe(actorForUser(login));
     }
   });
 });

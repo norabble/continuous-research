@@ -40,7 +40,12 @@ export interface OkfFacts {
   declines: DeclineRecord[];
   /** The living prose, or null when the instance has none yet. */
   findingsMd: string | null;
-  /** Absent ⇒ no computation concept is emitted. */
+  /**
+   * Absent ⇒ no computation concept is emitted, which is still **conformant**.
+   * OKF mandates no particular concepts — its rules govern whether what *is*
+   * present is well-formed (docs/okf-interop.md → Conformance), and every
+   * bundle rendered before this existed had no `computations/` at all.
+   */
   sensor?: SensorFacts;
   /** Freshness window in days; absent ⇒ no `stale_after` anywhere in the bundle. */
   staleAfterDays?: number;

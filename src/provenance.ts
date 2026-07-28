@@ -193,16 +193,28 @@ export function buildProvenanceStub(input: ProvenanceInput): ProvenanceStub {
 }
 
 /**
- * A GitHub login as an OKF actor.
+ * A GitHub user as an OKF actor. A bot becomes `process:<slug>`, never
+ * `human:` — OKF keys its highest trust tier, *human-reviewed*, off a
+ * `human:<id>` verifier, so an automated action must not be able to claim it.
  *
- * A bot login (`foo[bot]`) becomes `process:foo`, never `human:`. OKF keys its
- * highest trust tier — *human-reviewed* — off a `human:<id>` verifier, so an
- * auto-merge must not be able to claim it: no person attended that event.
+ * Two independent signals, because getting this wrong inflates a trust tier:
+ *
+ * - `isBot` — from the `type` field GitHub puts on every user object in an
+ *   event payload (`"Bot"` / `"User"` / `"Organization"`). This is the
+ *   authoritative one and should always be supplied where a payload exists.
+ * - The `<slug>[bot]` login suffix — the login GitHub assigns every App
+ *   installation identity. It is the fallback for a caller holding a login and
+ *   nothing else, and it also strips the suffix so the actor id names the app
+ *   rather than its rendering. Matched case-insensitively: GitHub emits it
+ *   lowercase, but nothing here should depend on that holding.
+ *
+ * Either signal alone is enough. Neither is required to be present.
  */
-export function actorForLogin(login: string): string {
+export function actorForUser(login: string, isBot = false): string {
   const name = requireNonEmpty(login, "login");
-  const bot = /^(.+)\[bot\]$/.exec(name)?.[1];
-  return bot === undefined ? `human:${name}` : `process:${bot}`;
+  const slug = /^(.+)\[bot\]$/i.exec(name)?.[1];
+  if (slug !== undefined) return `process:${slug}`;
+  return isBot ? `process:${name}` : `human:${name}`;
 }
 
 /**
