@@ -13,6 +13,8 @@
  * Actions expression, not a TS interpolation.
  */
 
+import { DEFAULT_ATTESTER } from "./okf";
+
 export interface ScaffoldFile {
   path: string;
   content: string;
@@ -23,6 +25,19 @@ const CONFIG = `{
   "site": { "enabled": false, "title": "TODO: your project title" },
   "okf": { "enabled": false }
 }
+`;
+
+/**
+ * The bundle's account of what makes a sensor run trustworthy. Scaffolded so it
+ * is a reviewed, committed artifact rather than generated prose; the export
+ * falls back to {@link DEFAULT_ATTESTER} when an instance deletes it.
+ */
+const ATTESTER = `${DEFAULT_ATTESTER}
+## This instance's descriptor scheme
+
+TODO: describe how this project's descriptors are formed and what a change in
+the source does to them — that is the part of the check the framework cannot
+state for you.
 `;
 
 const SENSE_WORKFLOW = `name: sense
@@ -123,6 +138,55 @@ jobs:
         env:
           GITHUB_TOKEN: \${{ steps.app-token.outputs.token }}
         run: npx --yes github:norabble/continuous-research#v0.1.7 record-decline
+`;
+
+const MERGED_WORKFLOW = `name: merged
+
+# The acceptance half of decline.yml: a merged data-PR is exactly what OKF
+# means by "verified", and the merge event is the only place that fact exists.
+# Recorded on the edition's provenance stub so okf-export stays offline and
+# token-free (docs/okf-interop.md).
+on:
+  # pull_request_target, not pull_request: this resolves in base context, needs
+  # no merge ref, and checks out no PR code (actions/checkout takes no \`ref:\`).
+  pull_request_target:
+    types: [closed]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  record-verification:
+    # Only merged data-PRs (the engine also no-ops defensively).
+    if: >-
+      github.event.pull_request.merged == true &&
+      contains(join(github.event.pull_request.labels.*.name, ','), 'data:')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Deliberately NOT serialized by a concurrency group. Each run touches a
+    # different file (one stub per descriptor), so there is no shared state to
+    # race on — while a shared group would cancel *pending* runs, silently
+    # losing a verification whenever two data-PRs merge close together. Should
+    # two commits to the base branch still collide, the run fails loudly and is
+    # safe to re-run: recording the same merge twice is a no-op.
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "24" # npm 11: npm 10 (node 22) cannot install commit-pinned git deps
+      - name: Mint App installation token
+        id: app-token
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
+        with:
+          app-id: \${{ secrets.CONTINUOUS_RESEARCH_APP_ID }}
+          private-key: \${{ secrets.CONTINUOUS_RESEARCH_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: read
+      - name: record-verification
+        env:
+          GITHUB_TOKEN: \${{ steps.app-token.outputs.token }}
+        run: npx --yes github:norabble/continuous-research#v0.1.7 record-verification
 `;
 
 const SITE_WORKFLOW = `name: site
@@ -576,7 +640,10 @@ Next steps:
   6. OKF export (optional): set okf.enabled in .research/config.json to
      render the accepted record as an Open Knowledge Format bundle into
      _okf/. It needs no token and no network. With the site layer on, the
-     bundle is published alongside it at <pages-url>/okf/.
+     bundle is published alongside it at <pages-url>/okf/. Fill in the TODO
+     in .research/attester.md, and set okf.staleAfterDays if your data has a
+     real shelf life. Merging a data-PR records the verification that earns
+     the bundle OKF's human-reviewed tier — keep merged.yml for that.
   7. Sensor repair (optional, Claude Code): if you keep
      .github/workflows/sensor-repair.yml, set CLAUDE_CODE_OAUTH_TOKEN and
      fill in its TODOs (app slug, sensor file, candidate sources); your
@@ -587,8 +654,10 @@ Next steps:
 export function scaffoldFiles(): ScaffoldFile[] {
   return [
     { path: ".research/config.json", content: CONFIG },
+    { path: ".research/attester.md", content: ATTESTER },
     { path: ".github/workflows/sense.yml", content: SENSE_WORKFLOW },
     { path: ".github/workflows/decline.yml", content: DECLINE_WORKFLOW },
+    { path: ".github/workflows/merged.yml", content: MERGED_WORKFLOW },
     { path: ".github/workflows/site.yml", content: SITE_WORKFLOW },
     { path: ".github/workflows/sensor-repair.yml", content: SENSOR_REPAIR_WORKFLOW },
     { path: ".github/workflows/interpretation.md", content: INTERPRETATION_WORKFLOW },

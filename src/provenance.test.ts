@@ -6,6 +6,8 @@ import {
   parseProvenanceStub,
   primarySource,
   provenanceFile,
+  actorForLogin,
+  withVerification,
   PROVENANCE_SCHEMA,
   PROVENANCE_SCHEMA_V1,
   PROVENANCE_SCHEMA_V2,
@@ -241,5 +243,48 @@ describe("provenanceFile", () => {
     const f = provenanceFile(buildProvenanceStub(valid));
     expect(f.path).toBe(".research/provenance/oews-2026.json");
     expect(f.content.endsWith("\n")).toBe(true);
+  });
+});
+
+describe("actorForLogin", () => {
+  it("maps a person to human: and a bot to process:", () => {
+    expect(actorForLogin("rbaker5")).toBe("human:rbaker5");
+    expect(actorForLogin("continuous-research-bot[bot]")).toBe("process:continuous-research-bot");
+  });
+
+  it("produces actors the stub validator accepts", () => {
+    for (const login of ["rbaker5", "some-bot[bot]", "a1"]) {
+      const stub = buildProvenanceStub({
+        ...valid,
+        verified: [{ by: actorForLogin(login), at: "2026-07-28T00:00:00Z" }],
+      });
+      expect(stub.verified?.[0]?.by).toBe(actorForLogin(login));
+    }
+  });
+});
+
+describe("withVerification", () => {
+  const stub = buildProvenanceStub(valid);
+  const merge = { by: "human:rbaker5", at: "2026-07-28T09:00:00Z" };
+
+  it("appends to a stub that has none", () => {
+    expect(withVerification(stub, merge).verified).toEqual([merge]);
+    expect(stub.verified).toBeUndefined(); // input untouched
+  });
+
+  // Re-running the merge workflow must not stack duplicate attestations; the
+  // identical reference is what lets the caller skip a pointless commit.
+  it("returns the same stub for an exact repeat", () => {
+    const once = withVerification(stub, merge);
+    expect(withVerification(once, merge)).toBe(once);
+  });
+
+  it("treats the same verifier at a different time as a real second event", () => {
+    const later = { by: merge.by, at: "2026-08-01T00:00:00Z" };
+    expect(withVerification(withVerification(stub, merge), later).verified).toEqual([merge, later]);
+  });
+
+  it("rejects an actor outside the OKF grammar", () => {
+    expect(() => withVerification(stub, { by: "rbaker5", at: merge.at })).toThrow(/verified.by/);
   });
 });

@@ -192,6 +192,35 @@ export function buildProvenanceStub(input: ProvenanceInput): ProvenanceStub {
   return stub;
 }
 
+/**
+ * A GitHub login as an OKF actor.
+ *
+ * A bot login (`foo[bot]`) becomes `process:foo`, never `human:`. OKF keys its
+ * highest trust tier — *human-reviewed* — off a `human:<id>` verifier, so an
+ * auto-merge must not be able to claim it: no person attended that event.
+ */
+export function actorForLogin(login: string): string {
+  const name = requireNonEmpty(login, "login");
+  const bot = /^(.+)\[bot\]$/.exec(name)?.[1];
+  return bot === undefined ? `human:${name}` : `process:${bot}`;
+}
+
+/**
+ * Append a verification to a stub, or return it **unchanged (same reference)**
+ * when that exact `{by, at}` is already recorded — callers use the identity to
+ * skip a pointless commit, and re-running the merge workflow must not stack
+ * duplicate attestations.
+ *
+ * Deduping on the pair rather than on `by` is deliberate: the same person
+ * verifying a later edition of the same descriptor is a real second event.
+ */
+export function withVerification(stub: ProvenanceStub, actor: Actor): ProvenanceStub {
+  const entry = buildActor(actor, "verified");
+  const existing = stub.verified ?? [];
+  if (existing.some((v) => v.by === entry.by && v.at === entry.at)) return stub;
+  return { ...stub, verified: [...existing, entry] };
+}
+
 /** The primary locator — the flat `source` of the v1 shape. */
 export function primarySource(stub: ProvenanceStub): string {
   const first = stub.sources[0];

@@ -27,8 +27,10 @@ Scaffolds a Continuous Research instance into the current directory:
 | File | What it is |
 | --- | --- |
 | `.research/config.json` | the instance's hook declarations (see *Config*) |
+| `.research/attester.md` | the bundle's account of what makes a sensor run trustworthy (one `TODO`: your descriptor scheme) |
 | `.github/workflows/sense.yml` | engine workflow: dispatch/cron → `sense` |
 | `.github/workflows/decline.yml` | engine workflow: PR closed-unmerged → `record-decline` |
+| `.github/workflows/merged.yml` | engine workflow: PR merged → `record-verification` |
 | `.github/workflows/site.yml` | engine workflow: data-PR events / findings pushes → `site` (+ `okf-export`) → GitHub Pages (gated: green while both layers are disabled) |
 | `.github/workflows/sensor-repair.yml` | optional Claude Code integration: two-job drift repair (delete the file to opt out) |
 | `.github/workflows/interpretation.md` | gh-aw agentic workflow (compile with `gh aw compile`) |
@@ -117,6 +119,37 @@ untrusted comments are never quoted into the record), falling back to
 > MEMBER therefore reads as `NONE`, their comment is untrusted, and the
 > record falls back to the default text. Make your org membership public if
 > you want closing comments captured on org-owned instances.
+
+### `record-verification`
+
+Runs from the `merged.yml` workflow when a pull request closes. The acceptance
+half of `record-decline`: a **merged** data-PR is precisely what OKF means by
+*verified*, and the merge event is the only place that fact exists. Appends the
+merge to the edition's own provenance stub as a `verified` entry. Deterministic;
+no agent, no inference.
+
+**Environment (required):** the same three as `record-decline`.
+
+**Behavior:** if the PR was *not* merged, or carries no `data:<descriptor>`
+label, it skips (exit 0) — the two commands are exact complements, so every
+closed data-PR feeds one of them. Otherwise it reads
+`.research/provenance/<descriptor>.json` from the default branch, appends
+`{by, at}` for the merge, and commits it back with `verify(<descriptor>):
+record merge`.
+
+- The actor is whoever merged it: `human:<login>`, or `process:<slug>` for a
+  bot. An auto-merge is a machine confirmation, and emitting `human:` for it
+  would claim OKF's *human-reviewed* tier for an event no person attended.
+- Re-running is safe: an identical `{by, at}` is already recorded, so nothing
+  is written. The same verifier at a different time is a real second event and
+  is kept.
+- A **missing stub fails the run.** A merge that cannot be attached to an
+  edition is a broken instance, and recording nothing quietly is the failure
+  mode this path exists to avoid.
+
+Recorded at merge rather than derived at export time on purpose: a bundle whose
+trust tier depended on whether the exporter held a token would be worse than one
+with no tier at all, and it would cost `okf-export` its offline property.
 
 ### `escalate-drift`
 
@@ -287,7 +320,9 @@ offline.
    a **malformed** file fails the run (same fail-closed rule as `site`).
 3. Read the findings prose (`impact.findings`, default `findings.md`). Absent
    is fine — the bundle is still conformant, just without findings.
-4. Render, then write each file under `_okf/`, logging
+4. Read `.research/attester.md` if present; absent means the framework's own
+   description of the check is used.
+5. Render, then write each file under `_okf/`, logging
    `[okf] wrote N files to _okf/`.
 
 **Output (under `_okf/`):**
@@ -298,6 +333,15 @@ offline.
 | `log.md` | `type: Log` — `**Accepted**` / `**Declined**` entries, newest-first under ISO date headings |
 | `findings/<claim-id>.md` | `type: Finding`, one per claim annotation |
 | `editions/<descriptor>.md` | `type: Edition`, one per accepted edition, carrying its full `sources` / `generated` / `verified` |
+| `computations/sensor.md` | `type: Attested Computation` — the declared sensor, its `runtime`, and the receipt a run must return |
+| `computations/attester.md` | `type: Reference` — the deterministic check `sensor.md` points `attester.resource` at |
+
+**Freshness.** With `okf.staleAfterDays` set, each edition gets
+`stale_after` = its retrieval date plus that many days. Editions only: an
+edition has a real retrieval date to anchor the window, a finding has no
+timestamp of its own and takes its freshness from the editions it cites. Unset
+means the key is absent everywhere — "no declared window" and "fresh forever"
+are different statements.
 
 **Citations are never invented.** A finding gets a `sources` list only when its
 prose names an edition (a backticked descriptor). Where it names none, the key
@@ -345,6 +389,7 @@ so an id that is unsafe as a path is dropped rather than written.
 | `okf.enabled` | boolean, required in block | master toggle for the `okf-export` command |
 | `okf.title` | string | the bundle's title; falls back to `site.title`, then `GITHUB_REPOSITORY` |
 | `okf.description` | string | optional one-line bundle description |
+| `okf.staleAfterDays` | positive integer | freshness window; each edition's `stale_after` is its retrieval date plus this. Absent ⇒ no `stale_after` at all |
 
 The sensor (like the workflow files themselves) is trusted code: anyone who
 can edit it controls what runs in CI. Review changes to it like workflow
@@ -415,7 +460,8 @@ that never drifts need not know the mechanism exists.
 | Label | `data:<descriptor>` — the dedup key; do not remove it |
 | Provenance stub | `.research/provenance/<descriptor>.json`, schema `continuous-research/provenance@v2`: `{ schema, descriptor, sources, retrievedAt, hash }` plus optional `generated` / `verified`. Committed on the data-PR branch; lands on the default branch at merge, where it is the durable "merged" marker. **`@v1` stubs still parse** (their flat `source` upcasts to a single `sources` entry keyed by the descriptor) and the path is unchanged, so existing instances need no migration. |
 | Decline record | `.research/decisions/<descriptor>.md` — YAML frontmatter (`descriptor`, `declined_at`, `data_pr`, `declined_by`) + the reason as body; committed straight to the default branch |
-| Commit messages | `data(<descriptor>): add <path>` / `decline(<descriptor>): record reason` |
+| Verification record | not a file of its own — a `verified: [{by, at}]` entry appended to the edition's existing provenance stub on the default branch, at merge |
+| Commit messages | `data(<descriptor>): add <path>` / `decline(<descriptor>): record reason` / `verify(<descriptor>): record merge` |
 
 ## Dedup semantics
 

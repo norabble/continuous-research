@@ -29,6 +29,21 @@ export type DetectionResult =
       generated?: Actor;
     };
 
+/**
+ * The keys a sensor run must return — i.e. the contract's *receipt*, which is
+ * what OKF's `executor.receipt` names (docs/okf-interop.md). Kept here beside
+ * {@link parseDetectionResult} so the published contract cannot drift from the
+ * one the engine actually enforces.
+ */
+export const DETECTION_RECEIPT_KEYS: readonly string[] = [
+  "changed",
+  "descriptor",
+  "source",
+  "retrievedAt",
+  "hash",
+  "artifacts",
+];
+
 /** Runs a sensor command and returns its stdout. Injected so orchestration stays pure. */
 export type SensorRunner = (command: string) => Promise<string>;
 

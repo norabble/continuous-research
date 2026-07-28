@@ -15,11 +15,20 @@ import type { ProvenanceStub } from "./provenance";
 import type { DeclineRecord } from "./decline";
 import { parseAnnotations, type Annotation } from "./annotations";
 import { formatDocument, type FrontmatterData } from "./frontmatter";
+import { DETECTION_RECEIPT_KEYS } from "./sensor";
 
 export interface OkfFile {
   /** Bundle-relative; the `_okf/` prefix is the CLI's business. */
   path: string;
   content: string;
+}
+
+/** What the bundle needs in order to describe the sensor as a computation. */
+export interface SensorFacts {
+  /** The instance's declared sensor command — the computation itself. */
+  command: string;
+  /** The instance's committed attester description, or null to use the default. */
+  attester: string | null;
 }
 
 export interface OkfFacts {
@@ -31,9 +40,47 @@ export interface OkfFacts {
   declines: DeclineRecord[];
   /** The living prose, or null when the instance has none yet. */
   findingsMd: string | null;
+  /** Absent ⇒ no computation concept is emitted. */
+  sensor?: SensorFacts;
+  /** Freshness window in days; absent ⇒ no `stale_after` anywhere in the bundle. */
+  staleAfterDays?: number;
 }
 
 export const OKF_VERSION = "0.2";
+
+/**
+ * OKF `executor.resource` — where a consumer reads the run instructions a
+ * runner follows. An absolute URL rather than a bundle path: a distributed
+ * bundle must still resolve it, and the engine is not part of the bundle.
+ */
+const EXECUTOR_RESOURCE =
+  "https://github.com/norabble/continuous-research/blob/main/docs/cli.md#sense";
+
+/**
+ * The framework's own account of the attester, true for any instance. An
+ * instance that wants to describe its *descriptor scheme* — the part the
+ * framework deliberately does not know — overrides it by committing
+ * `.research/attester.md`.
+ */
+export const DEFAULT_ATTESTER = `# Sensor attester
+
+The check is the engine's own, it runs on every sensor result before anything
+is proposed, and no model takes part in it.
+
+A detection result carries \`hash\`: an edition-level digest of the material the
+sensor actually read. The engine takes the receipt's \`descriptor\` and admits
+the run as a new edition only when no provenance stub for that descriptor is
+already committed on the default branch. The verdict is therefore a pure
+function of the receipt and the committed record — the same receipt against the
+same record always returns the same answer.
+
+The hash is then committed in the stub, which is what makes "don't store the
+bulk data, re-fetch it later" safe: a re-fetch can be compared against the
+digest the edition actually rested on.
+
+How a *content* change becomes a new descriptor is a property of the instance's
+descriptor scheme, which the framework does not define.
+`;
 
 /**
  * Claim ids are agent-authored and become file names, so they are validated
@@ -145,7 +192,16 @@ function okfSources(stub: ProvenanceStub): FrontmatterData[] {
   });
 }
 
-function editionDoc(stub: ProvenanceStub): OkfFile {
+/** `YYYY-MM-DD` + whole days, in UTC — OKF `stale_after` is an absolute date. */
+function addDays(isoDate: string, days: number): string {
+  return new Date(Date.parse(`${isoDate}T00:00:00Z`) + days * 86_400_000)
+    .toISOString()
+    .slice(0, 10);
+}
+
+function editionDoc(stub: ProvenanceStub, staleAfterDays: number | undefined): OkfFile {
+  const staleAfter =
+    staleAfterDays === undefined ? undefined : addDays(datePart(stub.retrievedAt), staleAfterDays);
   const data: FrontmatterData = {
     type: "Edition",
     title: `Edition ${stub.descriptor}`,
@@ -157,6 +213,7 @@ function editionDoc(stub: ProvenanceStub): OkfFile {
   // Only ever a real merge event; nothing here synthesizes one.
   if (stub.verified !== undefined) data.verified = stub.verified.map((v) => ({ ...v }));
   data.status = "stable";
+  if (staleAfter !== undefined) data.stale_after = staleAfter;
   data.descriptor = stub.descriptor;
   data.retrieved_at = stub.retrievedAt;
   data.hash = stub.hash;
@@ -165,6 +222,7 @@ function editionDoc(stub: ProvenanceStub): OkfFile {
     `# Edition ${stub.descriptor}`,
     "",
     `Retrieved ${datePart(stub.retrievedAt)}. Content hash \`${stub.hash}\`.`,
+    ...(staleAfter === undefined ? [] : ["", `Considered stale on or after ${staleAfter}.`]),
     "",
     "## Materials",
     "",
@@ -211,6 +269,71 @@ function findingDoc(section: FindingSection, byDescriptor: Map<string, Provenanc
 
 function datePart(iso: string): string {
   return iso.slice(0, 10);
+}
+
+/** A fence longer than any backtick run in `code`, so the block cannot be broken. */
+function fenceFor(code: string): string {
+  const runs = [...code.matchAll(/`+/g)].map((m) => m[0].length);
+  return "`".repeat(Math.max(3, ...runs.map((n) => n + 1)));
+}
+
+/**
+ * The sensor as an OKF `Attested Computation` (§10). CR already has the shape:
+ * a declared runtime, an executor whose receipt *is* the detection result, and a
+ * deterministic attester that involves no model.
+ *
+ * `parameters: []` is stated rather than omitted. OKF's model assumes declared
+ * holes an agent binds at call time; a CR sensor has none and no agent touches
+ * it at all, so CR is the degenerate, stricter case — and the empty list says so
+ * instead of inventing parameters to fill the slot (docs/okf-interop.md →
+ * Divergences).
+ */
+function computationDoc(facts: OkfFacts, sensor: SensorFacts): OkfFile {
+  const fence = fenceFor(sensor.command);
+  const data: FrontmatterData = {
+    type: "Attested Computation",
+    title: `${facts.title} — sensor`,
+    description: "The detection step this instance runs to produce editions.",
+    runtime: "shell",
+    parameters: [],
+    executor: { resource: EXECUTOR_RESOURCE, receipt: [...DETECTION_RECEIPT_KEYS] },
+    attester: { resource: "attester.md" },
+    status: "stable",
+  };
+
+  const body = [
+    `# ${facts.title} — sensor`,
+    "",
+    "The engine runs this command and parses one detection result from its",
+    "stdout. It takes no parameters, and no agent authors or edits it.",
+    "",
+    "# Computation",
+    "",
+    fence + "sh",
+    sensor.command,
+    fence,
+  ].join("\n");
+
+  return { path: "computations/sensor.md", content: formatDocument(data, body) };
+}
+
+/**
+ * The attester's own document, so `attester.resource` resolves inside the
+ * bundle. Separate from the computation on purpose: OKF permits exactly one
+ * fenced block in an Attested Computation body, and instance-authored prose
+ * containing a code fence would otherwise break conformance silently.
+ */
+function attesterDoc(facts: OkfFacts, sensor: SensorFacts): OkfFile {
+  const data: FrontmatterData = {
+    type: "Reference",
+    title: `${facts.title} — sensor attester`,
+    description: "The deterministic check that decides whether a run is a new edition.",
+    status: "stable",
+  };
+  return {
+    path: "computations/attester.md",
+    content: formatDocument(data, sensor.attester ?? DEFAULT_ATTESTER),
+  };
 }
 
 interface LogEntry {
@@ -279,6 +402,14 @@ function indexDoc(
     }
     body.push("");
   }
+  if (facts.sensor !== undefined) {
+    body.push(
+      "## Computations",
+      "",
+      "* [Sensor](computations/sensor.md) - how every edition here was obtained",
+      "",
+    );
+  }
   body.push("## History", "", "* [Bundle history](log.md) - accepted and declined editions");
 
   // §12: a bundle-root index.md is the only place frontmatter is permitted,
@@ -303,6 +434,12 @@ export function buildOkfBundle(facts: OkfFacts): OkfFile[] {
     indexDoc(facts, safe, editions),
     logDoc(facts),
     ...safe.map((s) => findingDoc(s, byDescriptor)),
-    ...editions.map(editionDoc),
+    ...editions.map((e) => editionDoc(e, facts.staleAfterDays)),
+    // Editions carry `stale_after`, findings do not: an edition has a real
+    // retrieval date to anchor the window, and a finding has no timestamp of its
+    // own. Its freshness follows from the editions it cites.
+    ...(facts.sensor === undefined
+      ? []
+      : [computationDoc(facts, facts.sensor), attesterDoc(facts, facts.sensor)]),
   ];
 }

@@ -1,5 +1,14 @@
 import { describe, it, expect } from "vitest";
-import { runSense, runRecordDecline, runInit, runImpact, runSite, escalateDrift } from "./commands";
+import {
+  runSense,
+  runRecordDecline,
+  runRecordVerification,
+  runInit,
+  runImpact,
+  runSite,
+  runOkfExport,
+  escalateDrift,
+} from "./commands";
 import type { GitHubPort, OpenPullRequest, OpenPullRequestInput, PutFileInput } from "./ports";
 import type { Descriptor, PullRequest } from "./types";
 import { provenancePathFor } from "./descriptor";
@@ -190,6 +199,79 @@ describe("runRecordDecline", () => {
   });
 });
 
+describe("runRecordVerification", () => {
+  const stub = serializeProvenanceStub(
+    buildProvenanceStub({
+      descriptor: "btcusd-2026-06-27",
+      source: "https://api.test/candles",
+      retrievedAt: "2026-06-27T00:00:00Z",
+      hash: "sha256:ab",
+    }),
+  );
+
+  it("writes the merge onto the edition's stub", async () => {
+    let committed = "";
+    const port = portWith({
+      readFileFromRef: () => Promise.resolve(stub),
+      putFile: (i) => {
+        committed = i.content;
+        return Promise.resolve();
+      },
+    });
+    const out = await runRecordVerification({
+      port,
+      descriptor: "btcusd-2026-06-27",
+      by: "human:rbaker5",
+      at: "2026-07-28T09:00:00Z",
+    });
+    expect(out).toEqual({ recorded: true });
+    expect(JSON.parse(committed)).toMatchObject({
+      verified: [{ by: "human:rbaker5", at: "2026-07-28T09:00:00Z" }],
+    });
+  });
+});
+
+describe("runOkfExport", () => {
+  const config = { sensor: "node sensor.mjs", okf: { enabled: true, title: "T" } };
+  const deps = (overrides: Partial<Parameters<typeof runOkfExport>[0]> = {}) => ({
+    config,
+    listDir: () => Promise.resolve([]),
+    readWorkingFile: () => Promise.reject(new Error("ENOENT")),
+    fallbackTitle: "owner/repo",
+    ...overrides,
+  });
+
+  it("returns null when the layer is off", async () => {
+    expect(await runOkfExport(deps({ config: { sensor: "x" } }))).toBeNull();
+  });
+
+  it("describes the sensor from the instance's declared command", async () => {
+    const files = await runOkfExport(deps());
+    const sensor = files?.find((f) => f.path === "computations/sensor.md")?.content ?? "";
+    expect(sensor).toContain("node sensor.mjs");
+  });
+
+  // Two live instances predate the file; requiring it would break their bundles.
+  it("falls back to the framework's attester description when none is committed", async () => {
+    const files = await runOkfExport(deps());
+    const attester = files?.find((f) => f.path === "computations/attester.md")?.content ?? "";
+    expect(attester).toContain("# Sensor attester");
+  });
+
+  it("prefers a committed .research/attester.md", async () => {
+    const files = await runOkfExport(
+      deps({
+        readWorkingFile: (path: string) =>
+          path === ".research/attester.md"
+            ? Promise.resolve("# Ours\n\nDescriptors embed the digest.")
+            : Promise.reject(new Error("ENOENT")),
+      }),
+    );
+    const attester = files?.find((f) => f.path === "computations/attester.md")?.content ?? "";
+    expect(attester).toContain("Descriptors embed the digest.");
+  });
+});
+
 describe("runInit", () => {
   it("writes every scaffold file and reports created vs existing", async () => {
     const written: string[] = [];
@@ -203,16 +285,20 @@ describe("runInit", () => {
     });
     expect(results).toEqual([
       { path: ".research/config.json", created: false },
+      { path: ".research/attester.md", created: true },
       { path: ".github/workflows/sense.yml", created: true },
       { path: ".github/workflows/decline.yml", created: true },
+      { path: ".github/workflows/merged.yml", created: true },
       { path: ".github/workflows/site.yml", created: true },
       { path: ".github/workflows/sensor-repair.yml", created: true },
       { path: ".github/workflows/interpretation.md", created: true },
       { path: ".github/workflows/comment-resolution.md", created: true },
     ]);
     expect(written).toEqual([
+      ".research/attester.md",
       ".github/workflows/sense.yml",
       ".github/workflows/decline.yml",
+      ".github/workflows/merged.yml",
       ".github/workflows/site.yml",
       ".github/workflows/sensor-repair.yml",
       ".github/workflows/interpretation.md",

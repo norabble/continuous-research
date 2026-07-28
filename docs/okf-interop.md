@@ -6,22 +6,21 @@ Format](https://github.com/GoogleCloudPlatform/knowledge-catalog/tree/main/okf)
 *Interop*; this page is the mechanism — the field-by-field mapping and the
 decisions that fix it.
 
-**Status.** The concept is settled and the export **ships**: `okf-export`
-renders `index.md`, `log.md`, `findings/`, and `editions/` from the instance's
-committed record ([CLI reference](./cli.md#okf-export)). Still outstanding, and
-tracked in the [backlog](./backlog.md#okf-interop) → *OKF interop*:
+**Status.** The concept is settled and the export **ships** in full:
+`okf-export` renders `index.md`, `log.md`, `findings/`, `editions/`, and
+`computations/` from the instance's committed record ([CLI
+reference](./cli.md#okf-export)). Every trust family v0.2 defines is now
+carried:
 
 | Family | State |
 | --- | --- |
 | `sources`, `generated` | shipped — carried by the provenance stub (`@v2`) and projected into the bundle |
 | per-claim attribution | shipped — the annotation's optional `editions:` field, preferred over the legacy prose scan |
-| `verified` | accepted and validated by the stub, but **nothing writes it** — it needs the merge event |
-| `stale_after` | not emitted |
-| `Attested Computation` | not emitted |
+| `verified` | shipped — written onto the stub at merge by `record-verification`, never derived at export |
+| `stale_after` | shipped — from `okf.staleAfterDays`, on editions only; absent when unset |
+| `Attested Computation` | shipped — `computations/sensor.md` + its attester |
 
-This document remains the specification the implementation follows, so the
-sections below describe the target shape; the table above is what to trust
-about today.
+The sections below are the specification the implementation follows.
 
 ## Why OKF
 
@@ -60,7 +59,8 @@ _okf/
 ├─ log.md                      edition / decline stream, newest-first
 ├─ findings/<claim-id>.md      type: Finding    — one per claim annotation
 ├─ editions/<descriptor>.md    type: Edition    — one per merged provenance stub
-└─ computations/sensor.md      type: Attested Computation — the sensor contract
+├─ computations/sensor.md      type: Attested Computation — the sensor contract
+└─ computations/attester.md    type: Reference  — the deterministic check
 ```
 
 ## Field mapping
@@ -69,14 +69,14 @@ _okf/
 | --- | --- | --- |
 | `sources[]` — `resource`, `id`, `title`, `last_modified` | provenance stub — `source`, `descriptor`, `retrievedAt` | `source` is one flat string today; it becomes `sources[0].resource` |
 | *(no OKF equivalent)* | stub `hash` (`sha256:…`) | rides as a **custom key**; OKF preserves unknown keys — see *Divergences* |
-| `generated: {by, at}` | *nothing today* | captured at sense time; closes the Q-E gap |
-| `verified: [{by, at}]` | the human data-PR merge | the **verification record**; written at merge, not derived at export |
+| `generated: {by, at}` | the sensor's declared producer | captured at sense time; closes the Q-E gap |
+| `verified: [{by, at}]` | the human data-PR merge | the **verification record**; written onto the stub at merge, not derived at export |
 | `status` — `draft` / `stable` / `deprecated` | **name collision only** — claim `status` is `supported` / `weakened` / `overturned` / `open` | different axes; see *Decision 2* |
-| `stale_after` | *nothing*; drift detection is adjacent | derived from config, absent when unset |
+| `stale_after` | `okf.staleAfterDays` + the edition's `retrievedAt` | an absolute `YYYY-MM-DD`; editions only, absent when unset |
 | `[^source-id]` footnotes | the inline claim annotation's `editions` | per-claim attribution; `backs` is separate — see *Decisions 6 and 7* |
 | `log.md` — newest-first `## YYYY-MM-DD` | the edition / decline stream | the evolution narrative, in a portable shape |
 | `index.md` + `okf_version` | *nothing* | bundle root only |
-| `type: Attested Computation` | the sensor contract | `receipt` **is** the detection result; the hash check **is** the attester |
+| `type: Attested Computation` | the sensor contract | `runtime: shell`; `executor.receipt` **is** the detection result's key set; the attester is the descriptor-keyed dedup |
 
 ### Actor grammar
 
@@ -89,7 +89,9 @@ OKF requires one of three actor forms. CR's assignment:
 | Human | `human:<id>` | `human:rbaker5` |
 
 `human:` is the prefix OKF consumers key the *human-reviewed* tier off. It is
-emitted **only** from a real merge or decline event, never from configuration.
+emitted **only** from a real merge event, never from configuration — and a
+merge performed by a bot yields `process:<slug>` instead, because an auto-merge
+is a machine confirmation and no person attended it.
 
 ## Decisions
 
@@ -120,6 +122,21 @@ emitted **only** from a real merge or decline event, never from configuration.
    recorded merge. Absence is meaningful in OKF, so a missing `verified` is a
    true statement, while a synthesized one is a lie that survives export into
    systems that trust it.
+
+   The corollary is *where* it is written: the merge event is the only place
+   the fact exists, so `record-verification` appends it to the edition's
+   provenance stub at merge. Deriving it at export time would make the bundle's
+   trust tier depend on whether the exporter happened to hold a token — worse
+   than no tier at all — and would cost `okf-export` its offline property. It
+   also fails loudly when the stub is missing rather than skipping quietly.
+
+8. **The freshness window is declared, not inferred.** `stale_after` comes from
+   `okf.staleAfterDays`, a maintainer's statement about the data's shelf life.
+   It is emitted on **editions only**: an edition has a real retrieval date to
+   anchor the window, while a finding has no timestamp of its own and inherits
+   its freshness from the editions it cites. Unset means the key is absent
+   everywhere — "no declared window" and "fresh forever" are different claims,
+   and OKF reads a missing key as the former.
 
 5. **Permissive `resource`.** OKF requires `sources[].resource`; CR's `source`
    is a free, unvalidated locator (not always a URL). The export passes it
@@ -156,7 +173,23 @@ Stated rather than papered over, per *Adopt the vocabulary, not the model*.
   MAY only supply values for the declared parameters; it MUST NOT author or edit
   the computation." A CR sensor takes no parameters and no agent touches it at
   all. CR is the **degenerate, stricter case**, and the mapping says so instead
-  of inventing parameters to fill the slot.
+  of inventing parameters to fill the slot: `parameters: []` is emitted
+  explicitly, since an omitted list would read as "not stated" rather than
+  "there are none".
+
+- **The attester is a description, not a script.** OKF's `attester.resource`
+  "names code (no LLM) that takes a receipt and returns a verdict". CR's check
+  is not a standalone file — it is the engine's own descriptor-keyed dedup
+  against the committed record, and there is nothing for an instance to vendor.
+  So `attester.resource` points at `computations/attester.md`, a prose account
+  of exactly what the check does. It satisfies "no LLM" and it is honest about
+  where the code lives; it is not an executable artifact, and this states that
+  rather than implying one.
+
+  That document is its own file rather than a section of `sensor.md` for a
+  mechanical reason: OKF permits exactly **one** fenced code block in an
+  Attested Computation body (it is the computation), so instance-authored prose
+  containing a fence would break conformance silently.
 - **Verification is per-edition, not per-document.** OKF `verified` attests a
   concept. CR's human merge attests **one edition** of the data behind it.
   Findings inherit their trust signal from the editions they cite, which is
@@ -182,7 +215,11 @@ only), so the framework checks its own output. A bundle is conformant when:
   `type`;
 - reserved filenames are limited to `index.md` and `log.md`;
 - `log.md` date headings match `## YYYY-MM-DD`, newest first;
-- `okf_version` appears only in the bundle-root `index.md`.
+- `okf_version` appears only in the bundle-root `index.md`;
+- every `stale_after` is an absolute `YYYY-MM-DD`;
+- every cross-link — including `attester.resource` — resolves to a file that is
+  actually in the bundle;
+- the Attested Computation body carries exactly one fenced block.
 
 The independent check is the reference implementation itself: pointing OKF's
 `visualize` at a generated bundle proves a third-party consumer reads it.

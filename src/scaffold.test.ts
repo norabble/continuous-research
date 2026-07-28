@@ -7,16 +7,41 @@ describe("scaffoldFiles", () => {
   const byPath = (p: string) => files.find((f) => f.path === p)?.content ?? "";
   const fileContent = byPath;
 
-  it("emits the config, both engine workflows, the site workflow, the optional sensor-repair workflow, and both agent templates", () => {
+  it("emits the config, the attester, every engine workflow, the optional sensor-repair workflow, and both agent templates", () => {
     expect(files.map((f) => f.path)).toEqual([
       ".research/config.json",
+      ".research/attester.md",
       ".github/workflows/sense.yml",
       ".github/workflows/decline.yml",
+      ".github/workflows/merged.yml",
       ".github/workflows/site.yml",
       ".github/workflows/sensor-repair.yml",
       ".github/workflows/interpretation.md",
       ".github/workflows/comment-resolution.md",
     ]);
+  });
+
+  it("merged.yml is the acceptance half of decline.yml", () => {
+    const merged = byPath(".github/workflows/merged.yml");
+    expect(merged).toContain("types: [closed]");
+    expect(merged).toContain("github.event.pull_request.merged == true");
+    expect(merged).toContain("record-verification");
+    expect(merged).toContain("permission-contents: write");
+    // Base context: needs no merge ref, and checks out no PR code.
+    expect(merged).toContain("pull_request_target:");
+    expect(merged).not.toMatch(/^\s*pull_request:/m);
+    expect(merged).not.toMatch(/^\s*ref:/m);
+    // No concurrency group: a shared one cancels *pending* runs, which would
+    // silently drop a verification whenever two data-PRs merge close together.
+    expect(merged).not.toContain("concurrency:");
+  });
+
+  it("scaffolds an attester description the export can project", () => {
+    const attester = byPath(".research/attester.md");
+    expect(attester).toContain("# Sensor attester");
+    // The framework states its own mechanism; the instance states its scheme.
+    expect(attester).toContain("TODO:");
+    expect(attester).toContain("descriptor scheme");
   });
 
   it("scaffolds the site workflow", () => {
@@ -149,7 +174,7 @@ describe("scaffoldFiles", () => {
   });
 
   it("engine-running workflows use node 24 (npm 11 installs commit-pinned git deps)", () => {
-    for (const p of ["sense.yml", "decline.yml", "site.yml"]) {
+    for (const p of ["sense.yml", "decline.yml", "merged.yml", "site.yml"]) {
       expect(fileContent(`.github/workflows/${p}`)).toContain('node-version: "24"');
     }
   });
