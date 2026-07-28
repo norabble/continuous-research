@@ -3,7 +3,7 @@
  * sensor, dedup, and write flows together. Every dependency (the port, the
  * sensor runner, artifact reads) is injected, so the command logic is unit-
  * testable without GitHub, a child process, or the filesystem (design rule 1).
- * The thin I/O shell that constructs the real deps lives in `cli.ts` (next step).
+ * The thin I/O shell that constructs the real dependencies lives in `cli.ts` (next step).
  */
 
 import type { Descriptor, DedupState } from "./types";
@@ -52,19 +52,19 @@ export type SenseOutcome =
   | { action: "skip"; state: DedupState; descriptor: Descriptor }
   | { action: "proposed"; descriptor: Descriptor; prNumber: number; branch: string };
 
-export interface SenseDeps {
+export interface SenseDependencies {
   config: ResearchConfig;
   runSensor: SensorRunner;
   port: GitHubPort;
   readArtifact: (path: string) => Promise<string>;
 }
 
-export async function runSense(deps: SenseDeps): Promise<SenseOutcome> {
-  const detection = parseDetectionResult(await deps.runSensor(deps.config.sensor));
+export async function runSense(dependencies: SenseDependencies): Promise<SenseOutcome> {
+  const detection = parseDetectionResult(await dependencies.runSensor(dependencies.config.sensor));
   if (!detection.changed) return { action: "none", reason: "sensor reported no change" };
 
   const { descriptor } = detection;
-  const { state, action } = await dedupe(deps.port, descriptor);
+  const { state, action } = await dedupe(dependencies.port, descriptor);
   if (action === "skip") return { action: "skip", state, descriptor };
 
   // `sources` / `generated` are optional in the sensor contract; when the
@@ -78,9 +78,12 @@ export async function runSense(deps: SenseDeps): Promise<SenseOutcome> {
     hash: detection.hash,
   });
   const artifacts = await Promise.all(
-    detection.artifacts.map(async (path) => ({ path, content: await deps.readArtifact(path) })),
+    detection.artifacts.map(async (path) => ({
+      path,
+      content: await dependencies.readArtifact(path),
+    })),
   );
-  const { prNumber, branch } = await proposeDataPR(deps.port, {
+  const { prNumber, branch } = await proposeDataPR(dependencies.port, {
     descriptor,
     provenance,
     artifacts,
@@ -88,7 +91,7 @@ export async function runSense(deps: SenseDeps): Promise<SenseOutcome> {
   return { action: "proposed", descriptor, prNumber, branch };
 }
 
-export interface RecordDeclineDeps {
+export interface RecordDeclineDependencies {
   port: GitHubPort;
   descriptor: Descriptor;
   prNumber: number;
@@ -97,19 +100,20 @@ export interface RecordDeclineDeps {
   defaultReason?: string;
 }
 
-export async function runRecordDecline(deps: RecordDeclineDeps): Promise<void> {
-  const latest = await deps.port.latestTrustedComment(deps.prNumber);
-  const reason = latest ?? deps.defaultReason ?? "Closed without merge; no reason provided.";
-  await recordDecline(deps.port, {
-    descriptor: deps.descriptor,
+export async function runRecordDecline(dependencies: RecordDeclineDependencies): Promise<void> {
+  const latest = await dependencies.port.latestTrustedComment(dependencies.prNumber);
+  const reason =
+    latest ?? dependencies.defaultReason ?? "Closed without merge; no reason provided.";
+  await recordDecline(dependencies.port, {
+    descriptor: dependencies.descriptor,
     reason,
-    declinedAt: deps.declinedAt,
-    prNumber: deps.prNumber,
-    declinedBy: deps.declinedBy,
+    declinedAt: dependencies.declinedAt,
+    prNumber: dependencies.prNumber,
+    declinedBy: dependencies.declinedBy,
   });
 }
 
-export interface RecordVerificationDeps {
+export interface RecordVerificationDependencies {
   port: GitHubPort;
   descriptor: Descriptor;
   /** OKF actor for whoever merged the data-PR. */
@@ -120,12 +124,16 @@ export interface RecordVerificationDeps {
 
 /** Mirror of {@link runRecordDecline} for the merge half of the same event. */
 export async function runRecordVerification(
-  deps: RecordVerificationDeps,
+  dependencies: RecordVerificationDependencies,
 ): Promise<{ recorded: boolean }> {
-  return recordVerification(deps.port, { descriptor: deps.descriptor, by: deps.by, at: deps.at });
+  return recordVerification(dependencies.port, {
+    descriptor: dependencies.descriptor,
+    by: dependencies.by,
+    at: dependencies.at,
+  });
 }
 
-export interface InitDeps {
+export interface InitDependencies {
   /** Writes the file if absent; resolves true if written, false if it existed. */
   writeIfAbsent: (path: string, content: string) => Promise<boolean>;
 }
@@ -135,10 +143,13 @@ export interface InitResultEntry {
   created: boolean;
 }
 
-export async function runInit(deps: InitDeps): Promise<InitResultEntry[]> {
+export async function runInit(dependencies: InitDependencies): Promise<InitResultEntry[]> {
   const results: InitResultEntry[] = [];
   for (const file of scaffoldFiles()) {
-    results.push({ path: file.path, created: await deps.writeIfAbsent(file.path, file.content) });
+    results.push({
+      path: file.path,
+      created: await dependencies.writeIfAbsent(file.path, file.content),
+    });
   }
   return results;
 }
@@ -151,7 +162,7 @@ export interface ImpactArtifact {
   lint: LintFinding[];
 }
 
-export interface ImpactDeps {
+export interface ImpactDependencies {
   config: ResearchConfig;
   port: GitHubPort;
   /** Reads a file from the PR working tree (the checked-out branch). */
@@ -163,38 +174,40 @@ export interface ImpactDeps {
   against?: string;
 }
 
-export async function runImpact(deps: ImpactDeps): Promise<ImpactArtifact> {
-  const impact = deps.config.impact;
+export async function runImpact(dependencies: ImpactDependencies): Promise<ImpactArtifact> {
+  const impact = dependencies.config.impact;
   if (!impact?.enabled) throw new Error("impact layer is disabled (config.impact.enabled)");
   if (!impact.resultsPath) throw new Error("config.impact.resultsPath is required");
   // Descriptors flow into fs paths (resultsPath, the .impact.json output); validate
   // them the way the label/branch helpers do on the sense/decline paths.
-  assertDescriptor(deps.descriptor);
-  if (deps.against) assertDescriptor(deps.against);
+  assertDescriptor(dependencies.descriptor);
+  if (dependencies.against) assertDescriptor(dependencies.against);
   const findingsPath = impact.findings ?? "findings.md";
 
   const next: unknown = JSON.parse(
-    await deps.readWorkingFile(resolveResultsPath(impact.resultsPath, deps.descriptor)),
+    await dependencies.readWorkingFile(
+      resolveResultsPath(impact.resultsPath, dependencies.descriptor),
+    ),
   );
-  const index = parseAnnotations(await deps.readWorkingFile(findingsPath));
+  const index = parseAnnotations(await dependencies.readWorkingFile(findingsPath));
 
   let changed: ChangedKey[] = [];
   let baseline: string | null = null;
   let priorIndex: ClaimIndex | undefined;
-  if (deps.against) {
-    const base = await deps.port.defaultBranch();
-    const priorPath = resolveResultsPath(impact.resultsPath, deps.against);
-    const priorRaw = await deps.port.readFileFromRef(base, priorPath);
+  if (dependencies.against) {
+    const base = await dependencies.port.defaultBranch();
+    const priorPath = resolveResultsPath(impact.resultsPath, dependencies.against);
+    const priorRaw = await dependencies.port.readFileFromRef(base, priorPath);
     // Fail closed: a named baseline whose results are absent is an error, not an
     // empty diff. Treating it as {} would guess a baseline (every key "added")
     // and stamp it as real — contradicting "no guessed baseline".
     if (priorRaw === null) {
-      throw new Error(`--against ${deps.against}: no results at ${priorPath} on ${base}`);
+      throw new Error(`--against ${dependencies.against}: no results at ${priorPath} on ${base}`);
     }
     const prev: unknown = JSON.parse(priorRaw);
     changed = diffResults(prev, next);
-    baseline = deps.against;
-    const priorFindings = await deps.port.readFileFromRef(base, findingsPath);
+    baseline = dependencies.against;
+    const priorFindings = await dependencies.port.readFileFromRef(base, findingsPath);
     if (priorFindings !== null) priorIndex = parseAnnotations(priorFindings);
   }
 
@@ -206,7 +219,7 @@ export async function runImpact(deps: ImpactDeps): Promise<ImpactArtifact> {
   // Impact runs on the PR branch checkout, which carries the incoming stub — so
   // the triggering descriptor is already "accepted" for lint purposes on the
   // very PR that introduces it.
-  const knownEditions = (await deps.listDir(PROVENANCE_DIR))
+  const knownEditions = (await dependencies.listDir(PROVENANCE_DIR))
     .filter((name) => name.endsWith(".json"))
     .map((name) => name.slice(0, -".json".length))
     .filter(isValidDescriptor);
@@ -216,10 +229,10 @@ export async function runImpact(deps: ImpactDeps): Promise<ImpactArtifact> {
       ? []
       : lintConsistency({ results: next, index, changed, priorIndex, knownEditions });
 
-  return { edition: deps.descriptor, baseline, changed, affected, lint };
+  return { edition: dependencies.descriptor, baseline, changed, affected, lint };
 }
 
-export interface SiteDeps {
+export interface SiteDependencies {
   config: ResearchConfig;
   port: GitHubPort;
   /** Injected so rendering stays deterministic (site-render.ts takes no clock). */
@@ -243,11 +256,11 @@ function firstDataDescriptor(labels: string[]): Descriptor | null {
  * Gathers SiteData from open PRs per the trust + labeling rules and renders
  * the site files; null when the site layer is off (the CLI logs and exits 0).
  */
-export async function runSite(deps: SiteDeps): Promise<SiteFile[] | null> {
-  const site = deps.config.site;
+export async function runSite(dependencies: SiteDependencies): Promise<SiteFile[] | null> {
+  const site = dependencies.config.site;
   if (!site?.enabled) return null;
 
-  const prs = await deps.port.listOpenPullRequests();
+  const prs = await dependencies.port.listOpenPullRequests();
   const updates: PendingUpdate[] = [];
   const maintenance: MaintenanceItem[] = [];
 
@@ -262,11 +275,11 @@ export async function runSite(deps: SiteDeps): Promise<SiteFile[] | null> {
       continue;
     }
 
-    const impactMd = await deps.port.readFileFromRef(
+    const impactMd = await dependencies.port.readFileFromRef(
       pr.headRef,
       `.research/impact/${descriptor}.md`,
     );
-    const provenanceRaw = await deps.port.readFileFromRef(
+    const provenanceRaw = await dependencies.port.readFileFromRef(
       pr.headRef,
       provenancePathFor(descriptor),
     );
@@ -283,23 +296,23 @@ export async function runSite(deps: SiteDeps): Promise<SiteFile[] | null> {
     });
   }
 
-  const defaultBranch = await deps.port.defaultBranch();
-  const findingsMd = await deps.port.readFileFromRef(defaultBranch, "findings.md");
+  const defaultBranch = await dependencies.port.defaultBranch();
+  const findingsMd = await dependencies.port.readFileFromRef(defaultBranch, "findings.md");
 
   const data: SiteData = {
-    title: site.title ?? deps.fallbackTitle,
+    title: site.title ?? dependencies.fallbackTitle,
     description: site.description,
-    generatedAt: deps.generatedAt,
+    generatedAt: dependencies.generatedAt,
     findingsMd,
     updates,
     maintenance,
-    repoSlug: deps.repoSlug,
+    repoSlug: dependencies.repoSlug,
   };
 
   return renderSite(data);
 }
 
-export interface OkfExportDeps {
+export interface OkfExportDependencies {
   config: ResearchConfig;
   /** File names directly inside a directory; `[]` when it does not exist. */
   listDir: (path: string) => Promise<string[]>;
@@ -318,28 +331,32 @@ export interface OkfExportDeps {
  * the default branch, i.e. in the checkout. So this needs no token and no
  * network, and the bundle is reproducible offline.
  */
-export async function runOkfExport(deps: OkfExportDeps): Promise<OkfFile[] | null> {
-  const okf = deps.config.okf;
+export async function runOkfExport(dependencies: OkfExportDependencies): Promise<OkfFile[] | null> {
+  const okf = dependencies.config.okf;
   if (!okf?.enabled) return null;
 
   const editions: ProvenanceStub[] = [];
-  for (const name of await deps.listDir(PROVENANCE_DIR)) {
+  for (const name of await dependencies.listDir(PROVENANCE_DIR)) {
     if (!name.endsWith(".json")) continue;
     // Fail closed, as runSite does: a malformed stub is a data-integrity
     // problem, not something to skip quietly.
-    editions.push(parseProvenanceStub(await deps.readWorkingFile(`${PROVENANCE_DIR}/${name}`)));
+    editions.push(
+      parseProvenanceStub(await dependencies.readWorkingFile(`${PROVENANCE_DIR}/${name}`)),
+    );
   }
 
   const declines: DeclineRecord[] = [];
-  for (const name of await deps.listDir(DECISIONS_DIR)) {
+  for (const name of await dependencies.listDir(DECISIONS_DIR)) {
     if (!name.endsWith(".md")) continue;
-    declines.push(parseDeclineRecord(await deps.readWorkingFile(`${DECISIONS_DIR}/${name}`)));
+    declines.push(
+      parseDeclineRecord(await dependencies.readWorkingFile(`${DECISIONS_DIR}/${name}`)),
+    );
   }
 
-  const findingsPath = deps.config.impact?.findings ?? "findings.md";
+  const findingsPath = dependencies.config.impact?.findings ?? "findings.md";
   let findingsMd: string | null;
   try {
-    findingsMd = await deps.readWorkingFile(findingsPath);
+    findingsMd = await dependencies.readWorkingFile(findingsPath);
   } catch {
     findingsMd = null; // an instance without prose still gets a valid bundle
   }
@@ -349,24 +366,24 @@ export async function runOkfExport(deps: OkfExportDeps): Promise<OkfFile[] | nul
   // project-defined descriptor scheme.
   let attester: string | null;
   try {
-    attester = await deps.readWorkingFile(ATTESTER_PATH);
+    attester = await dependencies.readWorkingFile(ATTESTER_PATH);
   } catch {
     attester = null;
   }
 
   const facts: OkfFacts = {
-    title: okf.title ?? deps.config.site?.title ?? deps.fallbackTitle,
+    title: okf.title ?? dependencies.config.site?.title ?? dependencies.fallbackTitle,
     editions,
     declines,
     findingsMd,
-    sensor: { command: deps.config.sensor, attester },
+    sensor: { command: dependencies.config.sensor, attester },
   };
   if (okf.description !== undefined) facts.description = okf.description;
   if (okf.staleAfterDays !== undefined) facts.staleAfterDays = okf.staleAfterDays;
   return buildOkfBundle(facts);
 }
 
-export interface EscalateDriftDeps {
+export interface EscalateDriftDependencies {
   github: GitHubPort;
   /** UTF-8 report content, or null when no report exists (the no-drift case). */
   readReport: () => Promise<string | null>;
@@ -385,29 +402,31 @@ export type EscalateDriftOutcome =
  * issue is agent-consumed instructions, so an open thread on a public repo
  * would be a prompt-injection channel.
  */
-export async function escalateDrift(deps: EscalateDriftDeps): Promise<EscalateDriftOutcome> {
-  const report = await deps.readReport();
+export async function escalateDrift(
+  dependencies: EscalateDriftDependencies,
+): Promise<EscalateDriftOutcome> {
+  const report = await dependencies.readReport();
   if (report === null) {
-    deps.log("escalate-drift: no drift report — nothing to do");
+    dependencies.log("escalate-drift: no drift report — nothing to do");
     return { outcome: "no-drift" };
   }
   // Fail-fast: validate the report BEFORE any GitHub write. planDriftEscalation
   // re-parses below (kept simple, signatures stable) — this call exists only to
   // reject a malformed report ahead of ensureLabel/listOpenIssueNumbersByLabel.
   parseDriftReport(report);
-  await deps.github.ensureLabel(DRIFT_LABEL, DRIFT_LABEL_DESCRIPTION, DRIFT_LABEL_COLOR);
-  const open = await deps.github.listOpenIssueNumbersByLabel(DRIFT_LABEL);
+  await dependencies.github.ensureLabel(DRIFT_LABEL, DRIFT_LABEL_DESCRIPTION, DRIFT_LABEL_COLOR);
+  const open = await dependencies.github.listOpenIssueNumbersByLabel(DRIFT_LABEL);
   const plan = planDriftEscalation(report, open);
   let issueNumber: number;
   if (plan.action === "create") {
-    issueNumber = await deps.github.createIssue(plan.title, plan.body, [DRIFT_LABEL]);
-    deps.log(`escalate-drift: opened issue #${issueNumber}`);
+    issueNumber = await dependencies.github.createIssue(plan.title, plan.body, [DRIFT_LABEL]);
+    dependencies.log(`escalate-drift: opened issue #${issueNumber}`);
   } else {
     issueNumber = plan.issueNumber as number;
-    await deps.github.commentOnIssue(issueNumber, plan.body);
-    deps.log(`escalate-drift: commented on open issue #${issueNumber}`);
+    await dependencies.github.commentOnIssue(issueNumber, plan.body);
+    dependencies.log(`escalate-drift: commented on open issue #${issueNumber}`);
   }
-  await deps.github.lockIssue(issueNumber);
+  await dependencies.github.lockIssue(issueNumber);
   return plan.action === "create"
     ? { outcome: "created", issueNumber }
     : { outcome: "commented", issueNumber };
