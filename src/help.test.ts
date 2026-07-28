@@ -18,6 +18,7 @@ describe("helpText", () => {
       "init",
       "sense",
       "record-decline",
+      "record-verification",
       "impact",
       "site",
       "okf-export",

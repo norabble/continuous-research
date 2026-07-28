@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { proposeDataPR, recordDecline, buildProposalContent } from "./flows";
+import { proposeDataPR, recordDecline, recordVerification, buildProposalContent } from "./flows";
 import type { GitHubPort } from "./ports";
-import { buildProvenanceStub } from "./provenance";
+import { buildProvenanceStub, parseProvenanceStub, serializeProvenanceStub } from "./provenance";
 
 const provenance = buildProvenanceStub({
   descriptor: "oews-2026",
@@ -94,5 +94,72 @@ describe("recordDecline", () => {
       declinedAt: "2026-06-27T00:00:00Z",
     });
     expect(calls).toEqual(["defaultBranch", "putFile:main:.research/decisions/oews-2026.md"]);
+  });
+});
+
+describe("recordVerification", () => {
+  /** A port whose default branch holds `stub`, capturing what gets written back. */
+  function portWithStub(stubJson: string | null) {
+    const { port, calls } = recordingPort();
+    const written: string[] = [];
+    return {
+      calls,
+      written,
+      port: {
+        ...port,
+        readFileFromRef: (ref: string, path: string) => {
+          calls.push(`read:${ref}:${path}`);
+          return Promise.resolve(stubJson);
+        },
+        putFile: (i: { branch: string; path: string; content: string; message: string }) => {
+          calls.push(`putFile:${i.branch}:${i.path}:${i.message}`);
+          written.push(i.content);
+          return Promise.resolve();
+        },
+      } satisfies GitHubPort,
+    };
+  }
+
+  const merge = { by: "human:rbaker5", at: "2026-07-28T09:00:00Z" };
+
+  it("appends the merge to the edition's own stub on the default branch", async () => {
+    const { port, calls, written } = portWithStub(serializeProvenanceStub(provenance));
+    expect(await recordVerification(port, { descriptor: "oews-2026", ...merge })).toEqual({
+      recorded: true,
+    });
+    expect(calls).toEqual([
+      "defaultBranch",
+      "read:main:.research/provenance/oews-2026.json",
+      "putFile:main:.research/provenance/oews-2026.json:verify(oews-2026): record merge",
+    ]);
+    expect(parseProvenanceStub(written[0] as string).verified).toEqual([merge]);
+  });
+
+  it("does not write when that exact verification is already recorded", async () => {
+    const already = serializeProvenanceStub({ ...provenance, verified: [merge] });
+    const { port, calls, written } = portWithStub(already);
+    expect(await recordVerification(port, { descriptor: "oews-2026", ...merge })).toEqual({
+      recorded: false,
+    });
+    expect(written).toEqual([]);
+    expect(calls.some((c) => c.startsWith("putFile"))).toBe(false);
+  });
+
+  it("keeps an earlier verification when a second, different one arrives", async () => {
+    const first = { by: "process:auto-merge", at: "2026-07-01T00:00:00Z" };
+    const { port, written } = portWithStub(
+      serializeProvenanceStub({ ...provenance, verified: [first] }),
+    );
+    await recordVerification(port, { descriptor: "oews-2026", ...merge });
+    expect(parseProvenanceStub(written[0] as string).verified).toEqual([first, merge]);
+  });
+
+  // A merge we cannot attach to an edition must fail the workflow, not pass
+  // quietly — the decline path already lost records exactly that way.
+  it("throws rather than inventing a stub when none is on the default branch", async () => {
+    const { port } = portWithStub(null);
+    await expect(recordVerification(port, { descriptor: "oews-2026", ...merge })).rejects.toThrow(
+      /is not on main/,
+    );
   });
 });

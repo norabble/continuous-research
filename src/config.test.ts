@@ -58,4 +58,27 @@ describe("parseConfig — site block", () => {
   it("omits site when absent", () => {
     expect(parseConfig('{"sensor":"x"}').site).toBeUndefined();
   });
+
+  it("parses the optional OKF freshness window", () => {
+    expect(parseConfig('{"sensor":"x","okf":{"enabled":true,"staleAfterDays":30}}').okf).toEqual({
+      enabled: true,
+      staleAfterDays: 30,
+    });
+  });
+
+  // "No declared window" and "fresh forever" are different statements, so an
+  // unusable value must fail rather than degrade into an absent key.
+  it("rejects a non-positive or fractional freshness window", () => {
+    for (const v of ["0", "-1", "1.5", '"30"']) {
+      expect(() =>
+        parseConfig(`{"sensor":"x","okf":{"enabled":true,"staleAfterDays":${v}}}`),
+      ).toThrow('config "okf.staleAfterDays" must be a positive integer');
+    }
+  });
+
+  it("omits the freshness window when absent", () => {
+    expect(
+      parseConfig('{"sensor":"x","okf":{"enabled":true}}').okf?.staleAfterDays,
+    ).toBeUndefined();
+  });
 });

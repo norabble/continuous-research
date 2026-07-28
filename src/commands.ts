@@ -14,7 +14,7 @@ import { parseDetectionResult } from "./sensor";
 import { dedupe } from "./dedup";
 import type { ProvenanceStub } from "./provenance";
 import { buildProvenanceStub, parseProvenanceStub } from "./provenance";
-import { proposeDataPR, recordDecline } from "./flows";
+import { proposeDataPR, recordDecline, recordVerification } from "./flows";
 import type { DeclineRecord } from "./decline";
 import { parseDeclineRecord } from "./decline";
 import type { OkfFacts, OkfFile } from "./okf";
@@ -44,6 +44,8 @@ import {
 /** Where the engine's own records live; the OKF export enumerates both. */
 const PROVENANCE_DIR = ".research/provenance";
 const DECISIONS_DIR = ".research/decisions";
+/** Optional instance-authored attester description; the export falls back to the default. */
+const ATTESTER_PATH = ".research/attester.md";
 
 export type SenseOutcome =
   | { action: "none"; reason: string }
@@ -105,6 +107,22 @@ export async function runRecordDecline(deps: RecordDeclineDeps): Promise<void> {
     prNumber: deps.prNumber,
     declinedBy: deps.declinedBy,
   });
+}
+
+export interface RecordVerificationDeps {
+  port: GitHubPort;
+  descriptor: Descriptor;
+  /** OKF actor for whoever merged the data-PR. */
+  by: string;
+  /** ISO-8601 merge timestamp. */
+  at: string;
+}
+
+/** Mirror of {@link runRecordDecline} for the merge half of the same event. */
+export async function runRecordVerification(
+  deps: RecordVerificationDeps,
+): Promise<{ recorded: boolean }> {
+  return recordVerification(deps.port, { descriptor: deps.descriptor, by: deps.by, at: deps.at });
 }
 
 export interface InitDeps {
@@ -326,13 +344,25 @@ export async function runOkfExport(deps: OkfExportDeps): Promise<OkfFile[] | nul
     findingsMd = null; // an instance without prose still gets a valid bundle
   }
 
+  // The framework's default description is true for every instance; an instance
+  // that commits its own describes the part the framework cannot know — its
+  // project-defined descriptor scheme.
+  let attester: string | null;
+  try {
+    attester = await deps.readWorkingFile(ATTESTER_PATH);
+  } catch {
+    attester = null;
+  }
+
   const facts: OkfFacts = {
     title: okf.title ?? deps.config.site?.title ?? deps.fallbackTitle,
     editions,
     declines,
     findingsMd,
+    sensor: { command: deps.config.sensor, attester },
   };
   if (okf.description !== undefined) facts.description = okf.description;
+  if (okf.staleAfterDays !== undefined) facts.staleAfterDays = okf.staleAfterDays;
   return buildOkfBundle(facts);
 }
 

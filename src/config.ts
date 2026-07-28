@@ -35,6 +35,12 @@ export interface OkfConfig {
   title?: string;
   /** Optional one-line bundle description. */
   description?: string;
+  /**
+   * Freshness window in whole days. An edition's OKF `stale_after` is its
+   * retrieval date plus this many days; unset ⇒ the key is omitted entirely,
+   * because "no declared window" and "fresh forever" are different statements.
+   */
+  staleAfterDays?: number;
 }
 
 export interface ResearchConfig {
@@ -106,6 +112,16 @@ function parseOkf(raw: unknown): OkfConfig {
     if (typeof o.description !== "string")
       throw new Error('config "okf.description" must be a string');
     out.description = o.description;
+  }
+  if (o.staleAfterDays !== undefined) {
+    if (
+      typeof o.staleAfterDays !== "number" ||
+      !Number.isInteger(o.staleAfterDays) ||
+      o.staleAfterDays <= 0
+    ) {
+      throw new Error('config "okf.staleAfterDays" must be a positive integer');
+    }
+    out.staleAfterDays = o.staleAfterDays;
   }
   return out;
 }

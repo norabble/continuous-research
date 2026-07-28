@@ -192,6 +192,47 @@ export function buildProvenanceStub(input: ProvenanceInput): ProvenanceStub {
   return stub;
 }
 
+/**
+ * A GitHub user as an OKF actor. A bot becomes `process:<slug>`, never
+ * `human:` — OKF keys its highest trust tier, *human-reviewed*, off a
+ * `human:<id>` verifier, so an automated action must not be able to claim it.
+ *
+ * Two independent signals, because getting this wrong inflates a trust tier:
+ *
+ * - `isBot` — from the `type` field GitHub puts on every user object in an
+ *   event payload (`"Bot"` / `"User"` / `"Organization"`). This is the
+ *   authoritative one and should always be supplied where a payload exists.
+ * - The `<slug>[bot]` login suffix — the login GitHub assigns every App
+ *   installation identity. It is the fallback for a caller holding a login and
+ *   nothing else, and it also strips the suffix so the actor id names the app
+ *   rather than its rendering. Matched case-insensitively: GitHub emits it
+ *   lowercase, but nothing here should depend on that holding.
+ *
+ * Either signal alone is enough. Neither is required to be present.
+ */
+export function actorForUser(login: string, isBot = false): string {
+  const name = requireNonEmpty(login, "login");
+  const slug = /^(.+)\[bot\]$/i.exec(name)?.[1];
+  if (slug !== undefined) return `process:${slug}`;
+  return isBot ? `process:${name}` : `human:${name}`;
+}
+
+/**
+ * Append a verification to a stub, or return it **unchanged (same reference)**
+ * when that exact `{by, at}` is already recorded — callers use the identity to
+ * skip a pointless commit, and re-running the merge workflow must not stack
+ * duplicate attestations.
+ *
+ * Deduping on the pair rather than on `by` is deliberate: the same person
+ * verifying a later edition of the same descriptor is a real second event.
+ */
+export function withVerification(stub: ProvenanceStub, actor: Actor): ProvenanceStub {
+  const entry = buildActor(actor, "verified");
+  const existing = stub.verified ?? [];
+  if (existing.some((v) => v.by === entry.by && v.at === entry.at)) return stub;
+  return { ...stub, verified: [...existing, entry] };
+}
+
 /** The primary locator — the flat `source` of the v1 shape. */
 export function primarySource(stub: ProvenanceStub): string {
   const first = stub.sources[0];

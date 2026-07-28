@@ -15,6 +15,7 @@ import { helpText } from "./help";
 import {
   runSense,
   runRecordDecline,
+  runRecordVerification,
   runInit,
   runImpact,
   runSite,
@@ -24,7 +25,7 @@ import {
 import { NEXT_STEPS } from "./scaffold";
 import { DRIFT_REPORT_PATH } from "./drift";
 import { execSensor, readArtifact, listDir, createGitHubPortFromEnv } from "./io";
-import { extractDeclineFromEvent } from "./event";
+import { extractDeclineFromEvent, extractVerificationFromEvent } from "./event";
 
 async function writeIfAbsent(path: string, content: string): Promise<boolean> {
   try {
@@ -66,6 +67,30 @@ async function cmdRecordDecline(): Promise<number> {
   const port = createGitHubPortFromEnv(process.env);
   await runRecordDecline({ port, ...inputs });
   console.log(`[record-decline] recorded decline for ${inputs.descriptor}`);
+  return 0;
+}
+
+async function cmdRecordVerification(): Promise<number> {
+  const eventPath = process.env.GITHUB_EVENT_PATH;
+  if (!eventPath) throw new Error("GITHUB_EVENT_PATH is required");
+  const event: unknown = JSON.parse(await readFile(eventPath, "utf8"));
+  const inputs = extractVerificationFromEvent(event);
+  if (!inputs) {
+    console.log("[record-verification] skipped (not merged, or not a data-PR)");
+    return 0;
+  }
+  const port = createGitHubPortFromEnv(process.env);
+  const { recorded } = await runRecordVerification({
+    port,
+    descriptor: inputs.descriptor,
+    by: inputs.mergedBy,
+    at: inputs.mergedAt,
+  });
+  console.log(
+    recorded
+      ? `[record-verification] recorded ${inputs.mergedBy} for ${inputs.descriptor}`
+      : `[record-verification] ${inputs.descriptor} already carries this verification`,
+  );
   return 0;
 }
 
@@ -167,6 +192,7 @@ const COMMANDS: Record<string, () => Promise<number>> = {
   init: cmdInit,
   sense: cmdSense,
   "record-decline": cmdRecordDecline,
+  "record-verification": cmdRecordVerification,
   impact: cmdImpact,
   site: cmdSite,
   "okf-export": cmdOkfExport,

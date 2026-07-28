@@ -93,43 +93,15 @@ wrong or absent.
 
 ## OKF interop
 
-The concept is settled (CONCEPT.md → *Interop*, Q-F) and the mapping is
-specified in [`okf-interop.md`](./okf-interop.md). The export mechanism
-(`okf-export`) and per-claim attribution both ship, and both instances are on
-v0.1.7 with their existing claims backfilled — 4 of 6 attributed, the other
-two deliberately empty because no edition established them. These are what is
-left, in the order they were staged. Each is independently useful — none
-blocks another.
-
-- **Verification record + freshness (`verified`, `stale_after`)** — human merge
-  is already the review spine (Q-D) and is exactly what OKF means by
-  *verified*, so instances have been producing human-reviewed knowledge with no
-  portable way to say so. `provenance@v2` accepts and validates `verified`, but
-  **nothing writes it**: it needs the merge event. Record it durably at merge
-  rather than deriving it at export time — a bundle whose trust tier depends on
-  whether the exporter happened to hold a token is worse than one with no tier
-  at all, and deriving it would also cost `okf-export` its no-token, offline
-  property. Note the symmetry: the decline record captures rejection, this
-  captures acceptance; the loop has only ever recorded half.
-  Done = `recordVerification` in `src/flows.ts` mirroring `recordDecline`
-  (commit to the default branch, `verify(<descriptor>): record merge`), a
-  `record-verification` command, a scaffolded `merged.yml` symmetric with
-  `decline.yml`, and a **new port read for merge metadata** — do *not* widen
-  `PullRequest` in `src/types.ts`, which is deliberately `{number, state,
-  labels}` to keep the dedup classifier pure. `stale_after` rides along from a
-  config-set staleness window, omitted entirely when unset.
-
-- **Sensor as an `Attested Computation`** — the sensor contract already has the
-  shape OKF's attestation model describes: a declared `runtime`, an `executor`,
-  a `receipt` (the detection result), and a deterministic attester (the content
-  hash that already guards against silent source drift). Mostly emission plus a
-  written attester description; little new logic. State the divergence rather
-  than papering over it (already noted in `okf-interop.md`): OKF assumes a
-  parameterized computation whose parameters an agent binds, and CR sensors take
-  no parameters and no agent touches them — CR is the degenerate, stricter case.
-  Done = `computations/sensor.md` emitted into the bundle from `config.sensor`
-  plus the detection-result contract, and an attester description committed
-  under `.research/`.
+**Done.** Every v0.2 trust family now ships — `sources` / `generated` /
+per-claim attribution, then `verified` + `stale_after` and the sensor as an
+`Attested Computation`. The mapping and its divergences are in
+[`okf-interop.md`](./okf-interop.md); nothing is outstanding here. What is left
+is *adoption*, which is instance work rather than framework work: both
+instances need the pin bump that brings them `merged.yml`, and every edition
+merged before it existed carries no `verified`. Those can be backfilled — the
+merges are real and their actor and timestamp are still readable from the PR
+history — but only from that record. Nothing may be filled in by assumption.
 
 ## Security hardening (release/distribution)
 

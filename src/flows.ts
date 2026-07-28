@@ -9,10 +9,16 @@
 import type { Descriptor } from "./types";
 import type { GitHubPort } from "./ports";
 import type { ProvenanceStub } from "./provenance";
-import { primarySource, provenanceFile } from "./provenance";
+import {
+  parseProvenanceStub,
+  primarySource,
+  provenanceFile,
+  serializeProvenanceStub,
+  withVerification,
+} from "./provenance";
 import type { DeclineInput } from "./decline";
 import { declineFile } from "./decline";
-import { branchFor, labelFor } from "./descriptor";
+import { branchFor, labelFor, provenancePathFor } from "./descriptor";
 
 export interface ProposeInput {
   descriptor: Descriptor;
@@ -71,6 +77,55 @@ export async function proposeDataPR(port: GitHubPort, input: ProposeInput): Prom
   const prNumber = await port.openPullRequest({ head: branch, base, title, body });
   await port.addLabels(prNumber, [labelFor(descriptor)]);
   return { prNumber, branch };
+}
+
+export interface VerificationInput {
+  descriptor: Descriptor;
+  /** Whoever merged the data-PR, in the OKF actor grammar. */
+  by: string;
+  /** ISO-8601 timestamp of the merge. */
+  at: string;
+}
+
+/**
+ * Record the human merge as a `verified` entry on the edition's own provenance
+ * stub — the accepted record's existing home for it (CONCEPT.md → Interop).
+ *
+ * Written *at merge* rather than derived at export time on purpose: a bundle
+ * whose trust tier depends on whether the exporter happened to hold a token
+ * would be worse than one with no tier at all, and deriving it would cost
+ * `okf-export` its no-token, offline property. The symmetry is with
+ * {@link recordDecline} — the loop has always recorded rejection and never
+ * acceptance.
+ *
+ * Fails loudly when the stub is missing. A merge we cannot attach to an edition
+ * is a broken instance, and silence is exactly how a decline path already went
+ * wrong once.
+ */
+export async function recordVerification(
+  port: GitHubPort,
+  input: VerificationInput,
+): Promise<{ recorded: boolean }> {
+  const base = await port.defaultBranch();
+  const path = provenancePathFor(input.descriptor);
+  const json = await port.readFileFromRef(base, path);
+  if (json === null) {
+    throw new Error(
+      `Cannot record verification for ${input.descriptor}: ${path} is not on ${base}`,
+    );
+  }
+
+  const stub = parseProvenanceStub(json);
+  const updated = withVerification(stub, { by: input.by, at: input.at });
+  if (updated === stub) return { recorded: false };
+
+  await port.putFile({
+    branch: base,
+    path,
+    content: serializeProvenanceStub(updated),
+    message: `verify(${input.descriptor}): record merge`,
+  });
+  return { recorded: true };
 }
 
 export async function recordDecline(port: GitHubPort, input: DeclineInput): Promise<void> {

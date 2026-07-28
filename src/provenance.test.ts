@@ -6,6 +6,8 @@ import {
   parseProvenanceStub,
   primarySource,
   provenanceFile,
+  actorForUser,
+  withVerification,
   PROVENANCE_SCHEMA,
   PROVENANCE_SCHEMA_V1,
   PROVENANCE_SCHEMA_V2,
@@ -241,5 +243,61 @@ describe("provenanceFile", () => {
     const f = provenanceFile(buildProvenanceStub(valid));
     expect(f.path).toBe(".research/provenance/oews-2026.json");
     expect(f.content.endsWith("\n")).toBe(true);
+  });
+});
+
+describe("actorForUser", () => {
+  it("maps a person to human: and an App identity to process:", () => {
+    expect(actorForUser("rbaker5")).toBe("human:rbaker5");
+    expect(actorForUser("continuous-research-bot[bot]")).toBe("process:continuous-research-bot");
+  });
+
+  // GitHub's `type` field is the authoritative signal; the login suffix is the
+  // fallback. Either alone must be enough — inflating a trust tier is the one
+  // outcome that must not be reachable.
+  it("honours the type flag even when the login carries no suffix", () => {
+    expect(actorForUser("some-service", true)).toBe("process:some-service");
+    expect(actorForUser("some-service", false)).toBe("human:some-service");
+  });
+
+  it("matches the suffix case-insensitively, with or without the flag", () => {
+    expect(actorForUser("Weird[BOT]")).toBe("process:Weird");
+    expect(actorForUser("Weird[Bot]", false)).toBe("process:Weird");
+  });
+
+  it("produces actors the stub validator accepts", () => {
+    for (const login of ["rbaker5", "some-bot[bot]", "a1"]) {
+      const stub = buildProvenanceStub({
+        ...valid,
+        verified: [{ by: actorForUser(login), at: "2026-07-28T00:00:00Z" }],
+      });
+      expect(stub.verified?.[0]?.by).toBe(actorForUser(login));
+    }
+  });
+});
+
+describe("withVerification", () => {
+  const stub = buildProvenanceStub(valid);
+  const merge = { by: "human:rbaker5", at: "2026-07-28T09:00:00Z" };
+
+  it("appends to a stub that has none", () => {
+    expect(withVerification(stub, merge).verified).toEqual([merge]);
+    expect(stub.verified).toBeUndefined(); // input untouched
+  });
+
+  // Re-running the merge workflow must not stack duplicate attestations; the
+  // identical reference is what lets the caller skip a pointless commit.
+  it("returns the same stub for an exact repeat", () => {
+    const once = withVerification(stub, merge);
+    expect(withVerification(once, merge)).toBe(once);
+  });
+
+  it("treats the same verifier at a different time as a real second event", () => {
+    const later = { by: merge.by, at: "2026-08-01T00:00:00Z" };
+    expect(withVerification(withVerification(stub, merge), later).verified).toEqual([merge, later]);
+  });
+
+  it("rejects an actor outside the OKF grammar", () => {
+    expect(() => withVerification(stub, { by: "rbaker5", at: merge.at })).toThrow(/verified.by/);
   });
 });

@@ -249,14 +249,131 @@ text
   });
 });
 
+describe("freshness", () => {
+  const editionData = (facts: OkfFacts) =>
+    parseDocument(
+      buildOkfBundle(facts).find((f) => f.path === "editions/btcusd-2026-07-01.md")?.content ?? "",
+    ).data;
+
+  it("emits no stale_after at all when no window is configured", () => {
+    expect(editionData({ ...base, editions: [btc] })).not.toHaveProperty("stale_after");
+  });
+
+  it("dates the window from the edition's own retrieval, in UTC", () => {
+    // Retrieved 2026-07-02T18:30Z — a naive local-time addition slips a day.
+    expect(editionData({ ...base, editions: [btc], staleAfterDays: 30 }).stale_after).toBe(
+      "2026-08-01",
+    );
+  });
+
+  // A finding has no timestamp of its own; its freshness follows from the
+  // editions it cites, and inventing a date for it would be a guess.
+  it("puts the window on editions only, never on findings", () => {
+    const files = buildOkfBundle({
+      ...base,
+      editions: [btc],
+      findingsMd: SAMPLE_FINDINGS,
+      staleAfterDays: 30,
+    });
+    for (const f of files.filter((f) => !f.path.startsWith("editions/"))) {
+      expect(parseDocument(f.content).data, f.path).not.toHaveProperty("stale_after");
+    }
+  });
+});
+
+describe("the sensor as an Attested Computation", () => {
+  const sensor = { command: "node sensor.mjs", attester: null };
+  const files = buildOkfBundle({ ...base, editions: [btc], sensor });
+  const doc = (path: string) => parseDocument(files.find((f) => f.path === path)?.content ?? "");
+
+  it("emits nothing when the instance supplies no sensor facts", () => {
+    expect(
+      buildOkfBundle({ ...base, editions: [btc] }).some((f) => f.path.startsWith("computations/")),
+    ).toBe(false);
+  });
+
+  it("declares the runtime, executor and attester OKF §10 requires", () => {
+    const { data } = doc("computations/sensor.md");
+    expect(data.type).toBe("Attested Computation");
+    expect(data.runtime).toBe("shell");
+    expect(data.executor).toEqual({
+      resource: "https://github.com/norabble/continuous-research/blob/main/docs/cli.md#sense",
+      // The receipt is literally the detection-result contract the engine enforces.
+      receipt: ["changed", "descriptor", "source", "retrievedAt", "hash", "artifacts"],
+    });
+    expect(data.attester).toEqual({ resource: "attester.md" });
+  });
+
+  // CR is the degenerate, stricter case of OKF's model: no parameters exist for
+  // an agent to bind. The empty list states that; omitting it would not.
+  it("states the empty parameter list rather than omitting it", () => {
+    expect(doc("computations/sensor.md").data.parameters).toEqual([]);
+  });
+
+  it("carries the declared command as the single fenced block", () => {
+    const { body } = doc("computations/sensor.md");
+    expect(body).toContain("# Computation");
+    expect([...body.matchAll(/^```/gm)]).toHaveLength(2);
+    expect(body).toContain("node sensor.mjs");
+  });
+
+  // A command containing a fence would otherwise break the "single fenced
+  // block" rule silently, which is the failure mode this whole layer avoids.
+  it("survives a sensor command containing a code fence", () => {
+    const evil = buildOkfBundle({
+      ...base,
+      sensor: { command: 'sh -c "echo ``` hi"', attester: null },
+    });
+    const { body } = parseDocument(
+      evil.find((f) => f.path === "computations/sensor.md")?.content ?? "",
+    );
+    const fences = [...body.matchAll(/^`{4,}/gm)];
+    expect(fences).toHaveLength(2);
+    expect(body).toContain('sh -c "echo ``` hi"');
+  });
+
+  it("resolves attester.resource to a real document in the bundle", () => {
+    const { data } = doc("computations/sensor.md");
+    const target = `computations/${(data.attester as { resource: string }).resource}`;
+    expect(files.some((f) => f.path === target)).toBe(true);
+    expect(doc(target).data.type).toBe("Reference");
+  });
+
+  it("uses the instance's own attester description when it has one", () => {
+    const mine = buildOkfBundle({
+      ...base,
+      sensor: { command: "x", attester: "# Mine\n\nThe scheme hashes the source." },
+    });
+    const content = mine.find((f) => f.path === "computations/attester.md")?.content ?? "";
+    expect(content).toContain("The scheme hashes the source.");
+    expect(content).not.toContain("descriptor scheme, which the framework does not define");
+  });
+});
+
 // docs/okf-interop.md → Conformance. OKF ships no validator, so we assert our own.
-describe("conformance", () => {
-  const files = buildOkfBundle({
+//
+// Run over both shapes: OKF mandates no particular concepts, so a bundle with
+// no computations and no freshness window must be exactly as conformant as one
+// carrying everything. That is what makes those fields safely optional.
+const CONFORMANCE_CASES = {
+  "every family present": {
     ...base,
     editions: [btc, older],
     declines: [{ descriptor: "d9", declinedAt: "2026-06-29T00:00:00Z", reason: "no" }],
     findingsMd: SAMPLE_FINDINGS,
-  });
+    sensor: { command: "node sensor.mjs", attester: null },
+    staleAfterDays: 30,
+  },
+  "no sensor, no freshness window": {
+    ...base,
+    editions: [btc, older],
+    declines: [{ descriptor: "d9", declinedAt: "2026-06-29T00:00:00Z", reason: "no" }],
+    findingsMd: SAMPLE_FINDINGS,
+  },
+} satisfies Record<string, OkfFacts>;
+
+describe.each(Object.entries(CONFORMANCE_CASES))("conformance — %s", (_name, facts) => {
+  const files = buildOkfBundle(facts);
 
   it("gives every non-reserved document a non-empty type", () => {
     for (const file of files) {
@@ -294,6 +411,14 @@ describe("conformance", () => {
         const resolved = (target as string).replace(/^\.\.\//, "");
         expect(paths.has(resolved), `${file.path} -> ${target}`).toBe(true);
       }
+    }
+  });
+
+  it("dates every stale_after as an absolute YYYY-MM-DD", () => {
+    for (const file of files) {
+      const { stale_after: value } = parseDocument(file.content).data;
+      if (value === undefined) continue;
+      expect(value, file.path).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     }
   });
 });
