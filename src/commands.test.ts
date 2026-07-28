@@ -233,7 +233,7 @@ describe("runRecordVerification", () => {
 
 describe("runOkfExport", () => {
   const config = { sensor: "node sensor.mjs", okf: { enabled: true, title: "T" } };
-  const deps = (overrides: Partial<Parameters<typeof runOkfExport>[0]> = {}) => ({
+  const dependencies = (overrides: Partial<Parameters<typeof runOkfExport>[0]> = {}) => ({
     config,
     listDir: () => Promise.resolve([]),
     readWorkingFile: () => Promise.reject(new Error("ENOENT")),
@@ -242,25 +242,25 @@ describe("runOkfExport", () => {
   });
 
   it("returns null when the layer is off", async () => {
-    expect(await runOkfExport(deps({ config: { sensor: "x" } }))).toBeNull();
+    expect(await runOkfExport(dependencies({ config: { sensor: "x" } }))).toBeNull();
   });
 
   it("describes the sensor from the instance's declared command", async () => {
-    const files = await runOkfExport(deps());
+    const files = await runOkfExport(dependencies());
     const sensor = files?.find((f) => f.path === "computations/sensor.md")?.content ?? "";
     expect(sensor).toContain("node sensor.mjs");
   });
 
   // Two live instances predate the file; requiring it would break their bundles.
   it("falls back to the framework's attester description when none is committed", async () => {
-    const files = await runOkfExport(deps());
+    const files = await runOkfExport(dependencies());
     const attester = files?.find((f) => f.path === "computations/attester.md")?.content ?? "";
     expect(attester).toContain("# Sensor attester");
   });
 
   it("prefers a committed .research/attester.md", async () => {
     const files = await runOkfExport(
-      deps({
+      dependencies({
         readWorkingFile: (path: string) =>
           path === ".research/attester.md"
             ? Promise.resolve("# Ours\n\nDescriptors embed the digest.")
