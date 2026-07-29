@@ -4,6 +4,11 @@ Deferred items, none scheduled. Each entry says why it matters and what
 "done" is — enough to pick it up cold. (Security items come from the
 2026-07-06 review of the release → distribution → execution process.)
 
+**One exception, if you are picking this up cold:** *OKF interop* below is not
+deferred. The work is done and merged, and a numbered chain there is blocked on
+cutting a release — until that happens, none of it runs on any instance. Start
+there.
+
 ## Live site / interpretation
 
 - **Blockquote rendering + entity-regression test (bundled)** — site-md's
@@ -174,9 +179,28 @@ per-claim attribution, then `verified` + `stale_after` and the sensor as an
 [`okf-interop.md`](./okf-interop.md); nothing is outstanding here. What is left
 is *adoption*, which is instance work rather than framework work: both
 instances need the pin bump that brings them `merged.yml`, and every edition
-merged before it existed carries no `verified`. Those can be backfilled — the
-merges are real and their actor and timestamp are still readable from the PR
-history — but only from that record. Nothing may be filled in by assumption.
+merged before it existed carries no `verified`.
+
+That adoption is **blocked on a release that has not been cut**, and it is a
+chain — each step needs the one before it:
+
+1. **Cut a release.** `main` is 11 commits past `v0.1.7`, so nothing in this
+   section is running anywhere. The version is a judgment call rather than a
+   bump: `deps` → `dependencies` is a breaking change to the type surface
+   re-exported from `src/index.ts` (pre-1.0, and nothing consumes it as a
+   library today — instances run the CLI — so the cost is presentational).
+2. **Bump both instances' engine refs.** They differ deliberately:
+   `token-source-review` pins the tag `#v0.1.7`; `continuous-research-sample`
+   pins the release commit's SHA (`30c2b40`), which is the hardened path the
+   *Security hardening* section below argues for. Keep that difference.
+3. **Add `merged.yml` by hand to both.** `init` scaffolds it for new instances;
+   existing ones get nothing automatically, and without it a merge records no
+   verification.
+4. **Backfill `verified`** — currently 0 of 18 editions on the sample, 0 of 5 on
+   `token-source-review`. The merges are real and their actor and timestamp are
+   still readable from the PR history, but **only** from that record; nothing may
+   be filled in by assumption. A bot merge must attest as `process:`, not
+   `human:`.
 
 ## Security hardening (release/distribution)
 
