@@ -26,11 +26,31 @@ Deferred items, none scheduled. Each entry says why it matters and what
   workflow triggers on every App-authored PR, including `sensor-repair`'s fix
   PRs, whose bodies deliberately embed untrusted source-response samples; the
   `data:`-label guard today is prompt-level only (the workflow's own "stop if
-  no `data:` label" instruction, not the trigger). Done = the scaffolded
-  interpretation workflow (and the sample's) refuses non-`data:` PRs
-  mechanically — investigate gh-aw frontmatter support for label conditions
-  on the trigger (do not guess the syntax in the template now) — plus the
-  sample re-qualified against it.
+  no `data:` label" instruction, not the trigger). Measured cost on the sample
+  2026-07-28: a **3m19s agent run** to conclude "not a data-PR", on every
+  infrastructure PR.
+
+  The investigation the earlier version of this entry asked for is **done**, and
+  the answer has a trap in it. gh-aw does support a top-level `if:`, identically
+  in v0.81.6 and v0.83.4 — no upgrade needed. Its `on.pull_request.names` filter
+  is *not* usable here: exact label names, capped at 25, and our label carries an
+  unbounded descriptor. But the obvious `if:` on labels **would break the loop**:
+  `proposeDataPR` labels the PR *after* opening it (`src/flows.ts`; on the
+  sample's PR #40, created `04:11:54`, labeled `04:11:55`), so
+  `github.event.pull_request.labels` is empty in the `opened` payload and the
+  gate is false for every data-PR. A correct gate needs `labeled` in the trigger
+  types, and then wants `github.event.action != 'labeled' ||
+  startsWith(github.event.label.name, 'data:')` so a later unrelated label does
+  not re-interpret the PR. Done = that, in the scaffold and the sample, with a
+  data-PR observed still triggering.
+
+- **`site.yml`'s label gate never matches on `opened`** — the same
+  attach-after-open timing, already shipped. The scaffolded site workflow
+  triggers on `[opened, synchronize, reopened, closed]` and gates on a `data:`
+  label, so its `opened` runs have always skipped. Masked because `synchronize`
+  (the interpretation agent's push) and `closed` both fire later with the label
+  present, so the site still rebuilds and nobody noticed. Cosmetic today, but it
+  is the same bug as above and should be fixed with it rather than rediscovered.
 
 - **Impact declarations should lead with the revised claim** — the site's
   pending-update excerpt shows the impact markdown from the top, and the
@@ -56,8 +76,18 @@ wrong or absent.
   whose data-PRs all revise the same prose (the normal case) have every sibling
   conflict the moment one edition merges, so from then on closing a data-PR
   records **nothing at all** — the workflow does not fail, it never runs. The
-  tell is that every `decline` run in the repo belongs to a *merged* PR. Fixed
-  in the sample (its PR #43) by switching to `pull_request_target`, which
+  tell is that every `decline` run in the repo belongs to a *merged* PR.
+
+  A **conflict is not the only way in.** Observed on `token-source-review`
+  2026-07-29: closing and reopening a clean, mergeable PR ~5s after pushing to it
+  produced **no `pull_request` runs at all** — not `decline` on the close, not
+  interpretation on the reopen — while `pull_request_target` (`site`) fired three
+  times. GitHub had not yet computed `refs/pull/N/merge` for the new head. So the
+  same silence arrives from a *timing race* whenever an automation closes a PR
+  soon after pushing, with nothing anywhere reporting a skip. Waiting for the
+  merge ref to appear is the workaround; `pull_request_target` removes the class.
+
+  Fixed in the sample (its PR #43) by switching to `pull_request_target`, which
   resolves in base context and needs no merge ref; safe for the same reason
   `site.yml` already documents — `actions/checkout` takes no `ref:`, so no PR
   code is checked out or executed, and the engine is pinned by commit and only
@@ -90,6 +120,51 @@ wrong or absent.
   paragraph (with the full text staying in the decline record, which is the
   canonical copy), or it indents continuation lines to keep them inside the
   list item. Prefer the former — a log is an index, not the record itself.
+
+## Agent layer (gh-aw)
+
+Found 2026-07-29 upgrading both instances from gh-aw v0.81.6 to v0.83.4.
+
+- **Comment resolution reports changes it never made** — the first
+  `/resolve` run ever to *execute* on the sample (every earlier one was
+  `skipped`) finished green and posted a comment stating it had rewritten a
+  phrase in `findings.md`. It had not: no commit, prose unchanged, and its own
+  sentence carried an empty filename slot. It called `add_comment` and never
+  called `push_to_pull_request_branch`. Two things keep it silent — nothing ties
+  the agent's claim to an actual diff, and gh-aw's `if_no_changes: "warn"` means
+  even a called-but-empty push would not fail. This is the trust-honesty rule
+  turned on the loop's own output: a signal emitted where no event backs it, and
+  a reviewer has no way to tell. The template is scaffolded, so every adopter has
+  it. Done = the workflow fails, or says plainly that it changed nothing, when a
+  run that claims an edit produced no commit; plus the sample re-qualified.
+
+- **The agent CLI version is inherited, stale, and not independently
+  settable** — gh-aw pins `@google/gemini-cli` **0.39.1** (published
+  2026-04-24) in `constants.DefaultGeminiVersion`, unchanged across v0.81.6,
+  v0.83.4 and `main`, while its sibling constants move (Claude Code 2.1.220,
+  Copilot 1.0.75, Codex 0.146.0). Instances inherit it silently.
+
+  It has a measurable cost. On `token-source-review`, `gemini-3.5-flash-lite`
+  reports `cached: 0` on every turn, so every turn re-sends the whole prompt;
+  `gemini-3.1-flash-lite` cached 4k–12k tokens in the same repo on the same
+  gh-aw version, models alternating on the same day. That is not a model
+  limitation — Google documents caching as supported for both, implicit caching
+  needs no client action, and *neither* appears in Google's implicit-caching
+  threshold table, so the model list cannot be what separates them. The leading
+  explanation is that the April client predates the July model. It also caused a
+  hard failure: v0.83.4's api-proxy enforces `maxCacheMisses` (default 5) where
+  v0.81.6's did not, so a zero-caching engine aborts mid-run — worked around
+  there with `max-turn-cache-misses: 20`, which *tolerates* the waste.
+
+  `engine.version` is a real compiler input (verified: the lock installs the
+  version given) but **not a usable knob** — gh-aw's generated Gemini
+  configuration is coupled to the CLI it pins, and 0.53.0 rejects the auth setup
+  gh-aw writes (`Invalid auth method selected`, exit 41; stating the type via
+  `GEMINI_DEFAULT_AUTH_TYPE` did not help). So the caching hypothesis is
+  **untested, not disproven**. Done = raise the stale pin upstream, and until it
+  moves, note in `adopting.md` that a model newer than gh-aw's pinned CLI may
+  silently lose prompt caching — the adopter-visible symptom is a rising token
+  bill with no change in workload.
 
 ## OKF interop
 

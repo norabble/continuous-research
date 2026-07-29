@@ -34,6 +34,14 @@ Merge authority stays with you. Agents only ever propose.
 - Locally: `gh` (authenticated) and the gh-aw extension
   (`gh extension install github/gh-aw`). Node ≥ 22 if you want to run the
   engine locally; CI installs its own.
+
+  The **compiler version is a build input**: `gh aw compile` bakes action pins,
+  container digests and the agent CLI version into the `.lock.yml` you commit,
+  and that lock is what runs. Two adopters on different gh-aw versions therefore
+  get different locks from identical sources. Pin it deliberately —
+  `gh extension install github/gh-aw --pin vX.Y.Z` — and upgrade as its own
+  reviewed change. Both reference instances are qualified on **v0.83.4**
+  (2026-07-29).
 - An inference credential for the agent layer (see *Agent layer* below —
   a free-tier Gemini API key is the proven zero-cost path).
 
