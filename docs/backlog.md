@@ -149,27 +149,48 @@ Found 2026-07-29 upgrading both instances from gh-aw v0.81.6 to v0.83.4.
   v0.83.4 and `main`, while its sibling constants move (Claude Code 2.1.220,
   Copilot 1.0.75, Codex 0.146.0). Instances inherit it silently.
 
-  It has a measurable cost. On `token-source-review`, `gemini-3.5-flash-lite`
-  reports `cached: 0` on every turn, so every turn re-sends the whole prompt;
-  `gemini-3.1-flash-lite` cached 4k–12k tokens in the same repo on the same
-  gh-aw version, models alternating on the same day. That is not a model
-  limitation — Google documents caching as supported for both, implicit caching
-  needs no client action, and *neither* appears in Google's implicit-caching
-  threshold table, so the model list cannot be what separates them. The leading
-  explanation is that the April client predates the July model. It also caused a
-  hard failure: v0.83.4's api-proxy enforces `maxCacheMisses` (default 5) where
-  v0.81.6's did not, so a zero-caching engine aborts mid-run — worked around
-  there with `max-turn-cache-misses: 20`, which *tolerates* the waste.
-
   `engine.version` is a real compiler input (verified: the lock installs the
   version given) but **not a usable knob** — gh-aw's generated Gemini
   configuration is coupled to the CLI it pins, and 0.53.0 rejects the auth setup
   gh-aw writes (`Invalid auth method selected`, exit 41; stating the type via
-  `GEMINI_DEFAULT_AUTH_TYPE` did not help). So the caching hypothesis is
-  **untested, not disproven**. Done = raise the stale pin upstream, and until it
-  moves, note in `adopting.md` that a model newer than gh-aw's pinned CLI may
-  silently lose prompt caching — the adopter-visible symptom is a rising token
-  bill with no change in workload.
+  `GEMINI_DEFAULT_AUTH_TYPE` did not help). Done = raise the stale pin upstream.
+
+  **Not** filed here as a caching problem, though three earlier drafts of this
+  entry said it was. See the entry below for what the evidence actually shows.
+
+- **A short agent run reads as "no prompt caching", and it is an artifact** —
+  worth writing down because it produced three wrong diagnoses in a row.
+  `gemini-3.5-flash-lite` reported `cached: 0` on every run of 2–6 turns, while
+  `gemini-3.1-flash-lite` reported 4k–12k on runs of 1–3 turns in the same repo
+  on the same gh-aw version. That looked conclusively model-correlated. It is
+  not: a 447-turn run of `gemini-3.5-flash-lite` cached **21,788,700 of
+  26,029,105** input tokens. The model caches, heavily, once a run is long enough
+  to reuse its own prefix. The three explanations tried and discarded were the
+  model's capability, Google's implicit-caching threshold table, and gh-aw's
+  stale CLI pin — none survived.
+
+  Consequence for the framework: `cached` on a short run says nothing, so no
+  tuning decision should rest on it. `token-source-review` carries
+  `max-turn-cache-misses: 20` justified by the wrong reason; the number is still
+  defensible for short runs, but see the entry below before treating it as safe.
+
+- **Nothing stopped a 2h14m, 447-turn, 26M-token interpretation run** — on
+  `token-source-review`, 2026-07-30, triggered by an ordinary docs PR. It
+  exhausted the instance's **daily** Gemini free-tier quota (220 × `Quota
+  exceeded`, 27 × `You have exhausted your daily quota on this model`, 78 × HTTP
+  429) and then failed. `max-ai-credits` was at its 1000 default and logged
+  `AI credits exceeded (harness budget abort): false` — the budget guardrail
+  never fired, so the run was bounded only by the 429s.
+
+  Two framework-relevant angles. First, quota exhaustion is a **shared** failure:
+  the day's budget is gone for every workflow on that key, not just the one that
+  spent it. Second, and uncomfortably, raising `max-turn-cache-misses` from 5 to
+  20 removed a circuit breaker that had been terminating long runs early for the
+  wrong reason — the previous abort was crude, but it was a bound, and there is
+  now no effective per-run turn cap. Done = a real turn ceiling on the scaffolded
+  interpretation workflow (`max-turns`, which exists and is unset), plus finding
+  out why `max-ai-credits` did not abort. Do not restore the cache-miss ceiling
+  as the limiter — it was never measuring what it appeared to measure.
 
 ## OKF interop
 
