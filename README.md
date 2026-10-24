@@ -191,3 +191,19 @@ the mechanical impact layer's engine half (`impact` command + consistency
 linter) ships as an opt-in preview since `v0.1.3`; judgment review,
 `resolves_when`, and the storage-policy advisor have not started. Phase 1's
 record: [phase-1-plan](./docs/phase-1-plan.md).
+
+**OKF interop is complete** on `main` (CONCEPT.md → *Interop*, spec in
+[okf-interop.md](./docs/okf-interop.md)): every v0.2 trust family is carried —
+`sources` / `generated`, per-claim attribution, `verified` written at merge by
+`record-verification`, `stale_after`, and the sensor as an `Attested
+Computation`.
+
+**Released vs. running (2026-07-29).** The last release is `v0.1.7`; `main`
+carries **11 unreleased commits**, so nothing above `v0.1.7` is running
+anywhere yet. Both instances are on `v0.1.7` — `token-source-review` by tag,
+`continuous-research-sample` by the release commit's SHA — and therefore have
+neither `merged.yml` nor `record-verification`, and no edition carries
+`verified`. Adoption is blocked on cutting a release, and the version is a
+judgment call: the `deps` → `dependencies` rename is a **breaking change to the
+published type surface**. Both instances' gh-aw workflows are qualified on
+**v0.83.4**.
